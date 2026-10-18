@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -21,18 +20,18 @@ class _ProfilePageState extends State<ProfilePage> {
   final _birthController = TextEditingController();
 
   final _supabase = Supabase.instance.client;
+  final ImagePicker _imagePicker = ImagePicker();
 
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isAdmin = false;
+  bool _isUploadingPhoto = false;
 
   String _email = '';
   String? _profileId;
-
-  XFile? _selectedImage;
-  bool _isUploadingPhoto = false;
-
-  final ImagePicker _imagePicker = ImagePicker();
   String? _profilePhoto;
+
+  Uint8List? _selectedImageBytes;
 
   static const Color _green = Color(0xFF176B50);
 
@@ -68,7 +67,8 @@ class _ProfilePageState extends State<ProfilePage> {
       final data = await _supabase
           .from('profiles')
           .select(
-            'id, full_name, username, phone_number, date_of_birth, profile_photo',
+            'id, full_name, username, phone_number, '
+            'date_of_birth, profile_photo, role',
           )
           .eq('id', user.id)
           .maybeSingle();
@@ -76,21 +76,23 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
 
       if (data == null) {
+        setState(() => _isLoading = false);
         _showMessage(
           'Data profil belum ditemukan. Periksa data akun di Supabase.',
         );
-        setState(() => _isLoading = false);
         return;
       }
 
-      _profileId = data['id']?.toString();
-      _fullNameController.text = data['full_name']?.toString() ?? '';
-      _usernameController.text = data['username']?.toString() ?? '';
-      _phoneController.text = data['phone_number']?.toString() ?? '';
-      _birthController.text = data['date_of_birth']?.toString() ?? '';
-      _profilePhoto = data['profile_photo']?.toString();
-
-      setState(() => _isLoading = false);
+      setState(() {
+        _profileId = data['id']?.toString();
+        _fullNameController.text = data['full_name']?.toString() ?? '';
+        _usernameController.text = data['username']?.toString() ?? '';
+        _phoneController.text = data['phone_number']?.toString() ?? '';
+        _birthController.text = data['date_of_birth']?.toString() ?? '';
+        _profilePhoto = data['profile_photo']?.toString();
+        _isAdmin = data['role']?.toString() == 'admin';
+        _isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
 
@@ -130,11 +132,13 @@ class _ProfilePageState extends State<ProfilePage> {
             'date_of_birth': _birthController.text.trim().isEmpty
                 ? null
                 : _birthController.text.trim(),
+            'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', user.id);
 
       if (!mounted) return;
 
+      setState(() {});
       _showMessage('Profil berhasil disimpan.');
     } on PostgrestException catch (e) {
       if (!mounted) return;
@@ -166,15 +170,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (image == null || !mounted) return;
 
+      final Uint8List bytes = await image.readAsBytes();
+
       setState(() {
-        _selectedImage = image;
+        _selectedImageBytes = bytes;
         _isUploadingPhoto = true;
       });
 
-      final Uint8List bytes = await image.readAsBytes();
       final extension = image.name.contains('.')
           ? image.name.split('.').last.toLowerCase()
           : 'jpg';
+
+      final contentType = extension == 'jpg' || extension == 'jpeg'
+          ? 'image/jpeg'
+          : 'image/$extension';
 
       final filePath =
           '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$extension';
@@ -184,11 +193,7 @@ class _ProfilePageState extends State<ProfilePage> {
           .uploadBinary(
             filePath,
             bytes,
-            fileOptions: FileOptions(
-              contentType: extension == 'jpg'
-                  ? 'image/jpeg'
-                  : 'image/$extension',
-            ),
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
           );
 
       final photoUrl = _supabase.storage
@@ -197,14 +202,17 @@ class _ProfilePageState extends State<ProfilePage> {
 
       await _supabase
           .from('profiles')
-          .update({'profile_photo': photoUrl})
+          .update({
+            'profile_photo': photoUrl,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', user.id);
 
       if (!mounted) return;
 
       setState(() {
         _profilePhoto = photoUrl;
-        _selectedImage = null;
+        _selectedImageBytes = null;
       });
 
       _showMessage('Foto profil berhasil diperbarui.');
@@ -305,10 +313,51 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildProfilePhoto() {
+    ImageProvider? imageProvider;
+
+    if (_selectedImageBytes != null) {
+      imageProvider = MemoryImage(_selectedImageBytes!);
+    } else if (_profilePhoto != null && _profilePhoto!.isNotEmpty) {
+      imageProvider = NetworkImage(_profilePhoto!);
+    }
+
+    return CircleAvatar(
+      radius: 48,
+      backgroundColor: const Color(0xFFE1EEE8),
+      backgroundImage: imageProvider,
+      child: imageProvider == null
+          ? const Icon(Icons.person_outline, size: 48, color: _green)
+          : null,
+    );
+  }
+
+  Widget _buildAdminMenu({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: const Color(0xFFE1EEE8),
+          child: Icon(icon, color: _green),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final photo = _profilePhoto;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Profil Saya')),
       body: _isLoading
@@ -316,6 +365,7 @@ class _ProfilePageState extends State<ProfilePage> {
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
                     width: double.infinity,
@@ -326,21 +376,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     child: Column(
                       children: [
-                        CircleAvatar(
-                          radius: 48,
-                          backgroundColor: const Color(0xFFE1EEE8),
-                          backgroundImage: _selectedImage != null
-                              ? MemoryImage(
-                                  // Foto sementara sebelum upload selesai.
-                                  // Lihat catatan di bawah.
-                                  Uint8List(0),
-                                )
-                              : photo != null && photo.isNotEmpty
-                              ? NetworkImage(photo)
-                              : null,
-                        ),
-                        const SizedBox(height: 12),
-
+                        _buildProfilePhoto(),
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
                           onPressed: _isUploadingPhoto
@@ -361,7 +397,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 : 'Ganti Foto Profil',
                           ),
                         ),
-
+                        const SizedBox(height: 8),
                         Text(
                           _fullNameController.text.isEmpty
                               ? 'Nama pengguna'
@@ -374,20 +410,41 @@ class _ProfilePageState extends State<ProfilePage> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 4),
-                        
+                        Text(
+                          _email,
+                          style: TextStyle(color: Colors.grey.shade600),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (_isAdmin) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE1EEE8),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'ADMIN',
+                              style: TextStyle(
+                                color: _green,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
+
                   const SizedBox(height: 24),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Informasi Pribadi',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: _green,
-                      ),
-                    ),
+                  Text(
+                    'Informasi Pribadi',
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold, color: _green),
                   ),
                   const SizedBox(height: 16),
                   Form(
