@@ -31,6 +31,9 @@ class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
   bool _isAdmin = false;
 
+  String? _profilePhotoUrl;
+  bool _isLoadingPhoto = true;
+
   final List<String> _titles = const [
     'SafarMate',
     'Panduan Ibadah',
@@ -43,6 +46,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _loadUserRole();
+    _loadProfilePhoto();
   }
 
   Future<void> _loadUserRole() async {
@@ -64,6 +68,40 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     } catch (e) {
       debugPrint('Gagal memeriksa role pengguna: $e');
+    }
+  }
+
+  Future<void> _loadProfilePhoto() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+
+      if (user == null) {
+        if (!mounted) return;
+        setState(() => _isLoadingPhoto = false);
+        return;
+      }
+
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('profile_photo')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (!mounted) return;
+
+      setState(() {
+        _profilePhotoUrl = profile?['profile_photo'] as String?;
+        _isLoadingPhoto = false;
+      });
+    } catch (e) {
+      debugPrint('Gagal memuat foto profil: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _profilePhotoUrl = null;
+        _isLoadingPhoto = false;
+      });
     }
   }
 
@@ -287,10 +325,20 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           Row(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 25,
                 backgroundColor: safarLightGreen,
-                child: Icon(Icons.person_rounded, color: safarGreen, size: 30),
+                backgroundImage:
+                    _profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty
+                    ? NetworkImage(_profilePhotoUrl!)
+                    : null,
+                child: _profilePhotoUrl == null || _profilePhotoUrl!.isEmpty
+                    ? const Icon(
+                        Icons.person_rounded,
+                        color: safarGreen,
+                        size: 30,
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -561,11 +609,25 @@ class _DashboardPageState extends State<DashboardPage> {
           color: Colors.white,
           child: ListTile(
             contentPadding: const EdgeInsets.all(16),
-            leading: const CircleAvatar(
+
+            leading: CircleAvatar(
               radius: 28,
               backgroundColor: safarLightGreen,
-              child: Icon(Icons.person_rounded, color: safarGreen, size: 32),
+              backgroundImage:
+                  _profilePhotoUrl != null &&
+                      _profilePhotoUrl!.trim().isNotEmpty
+                  ? NetworkImage(_profilePhotoUrl!)
+                  : null,
+              child:
+                  _profilePhotoUrl == null || _profilePhotoUrl!.trim().isEmpty
+                  ? const Icon(
+                      Icons.person_rounded,
+                      color: safarGreen,
+                      size: 32,
+                    )
+                  : null,
             ),
+
             title: Text(
               name != null && name.trim().isNotEmpty
                   ? name
