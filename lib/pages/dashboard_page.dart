@@ -15,6 +15,9 @@ import 'tata_cara_umrah_page.dart';
 import 'doa_dan_dzikir_page.dart';
 import 'tips_perjalanan_page.dart';
 import 'tanya_safarmate_ai_page.dart';
+import 'peta_lokasi_page.dart';
+import 'kompas_kiblat_page.dart';
+import 'sensor_perangkat_page.dart';
 
 const Color safarGreen = Color(0xFF176B50);
 const Color safarBackground = Color(0xFFF7F8F5);
@@ -497,20 +500,32 @@ class _DashboardPageState extends State<DashboardPage> {
         _featureTile(
           Icons.map_outlined,
           'Peta Lokasi',
-          'Temukan tempat penting di sekitar',
-          () => _showComingSoon('Peta Lokasi'),
+          'Lihat destinasi penting di Makkah dan Madinah',
+          () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const PetaLokasiPage()));
+          },
         ),
         _featureTile(
           Icons.explore_outlined,
           'Kompas Kiblat',
           'Arahkan perangkat untuk membantu menentukan arah',
-          () => _showComingSoon('Kompas Kiblat'),
+          () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const KompasKiblatPage()));
+          },
         ),
         _featureTile(
           Icons.screen_rotation_outlined,
           'Sensor Perangkat',
           'Fitur orientasi dan accelerometer',
-          () => _showComingSoon('Sensor Perangkat'),
+          () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SensorPerangkatPage()),
+            );
+          },
         ),
       ],
     );

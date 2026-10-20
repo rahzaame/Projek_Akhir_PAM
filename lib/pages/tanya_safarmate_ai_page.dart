@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 const Color safarGreen = Color(0xFF176B50);
 const Color safarLightGreen = Color(0xFFE1F2E8);
@@ -12,33 +13,95 @@ class TanyaSafarMateAiPage extends StatefulWidget {
 
 class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
-      text: 'Assalamu’alaikum! Aku SafarMate AI. Antarmuka percakapan ini sudah disiapkan, tetapi layanan AI belum terhubung. Untuk sementara, silakan gunakan menu Tata Cara Umrah dan Doa dan Dzikir.',
+      text:
+          'Assalamu’alaikum! Aku SafarMate AI. '
+          'Silakan tanyakan seputar persiapan perjalanan, '
+          'panduan Umrah, atau informasi yang kamu butuhkan.',
       isUser: false,
     ),
   ];
 
+  bool _isLoading = false;
+
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+
+    if (text.isEmpty || _isLoading) return;
 
     setState(() {
       _messages.add(_ChatMessage(text: text, isUser: true));
-      _messages.add(
-        const _ChatMessage(
-          text: 'Pesanmu sudah masuk ke tampilan demo. Jawaban otomatis belum tersedia karena layanan AI belum diintegrasikan. Untuk pertanyaan hukum atau keabsahan ibadah, tanyakan kepada pembimbing ibadah yang kompeten.',
-          isUser: false,
-        ),
-      );
       _controller.clear();
+      _isLoading = true;
     });
+    _scrollToBottom();
+
+    try {
+      // Memanggil Supabase Edge Function.
+      // Fungsi ini perlu dibuat dan dihubungkan ke Gemini
+      // sebelum jawaban AI benar-benar tersedia.
+      final response = await Supabase.instance.client.functions.invoke(
+        'safarmate-ai',
+        body: {'message': text},
+      );
+
+      final data = response.data;
+      final answer = data is Map ? data['reply']?.toString() : null;
+
+      if (response.status < 200 ||
+          response.status >= 300 ||
+          answer == null ||
+          answer.trim().isEmpty) {
+        throw Exception('Respons AI tidak tersedia.');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(_ChatMessage(text: answer.trim(), isUser: false));
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(
+          const _ChatMessage(
+            text:
+                'Maaf, SafarMate AI belum dapat menjawab saat ini. '
+                'Pastikan koneksi internet tersedia dan layanan AI '
+                'sudah dikonfigurasi, lalu coba lagi.',
+            isUser: false,
+          ),
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _scrollToBottom();
+      }
+    }
   }
 
   @override
@@ -52,21 +115,36 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
       ),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            color: const Color(0xFFFFF5DF),
-            child: const Text(
-              'Mode demo — belum terhubung ke layanan AI. Jangan masukkan data pribadi atau informasi sensitif.',
-              style: TextStyle(fontSize: 12, height: 1.4),
-            ),
-          ),
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (_isLoading ? 1 : 0),
               itemBuilder: (context, index) {
+                if (_isLoading && index == _messages.length) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: safarGreen,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
                 final message = _messages[index];
+
                 return Align(
                   alignment: message.isUser
                       ? Alignment.centerRight
@@ -121,7 +199,7 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: _sendMessage,
+                    onPressed: _isLoading ? null : _sendMessage,
                     style: IconButton.styleFrom(
                       backgroundColor: safarGreen,
                       foregroundColor: Colors.white,
