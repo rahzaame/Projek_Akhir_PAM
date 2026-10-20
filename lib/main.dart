@@ -10,7 +10,7 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: SupabaseConfig.projectUrl,
-    anonKey: SupabaseConfig.publishableKey,
+    publishableKey: SupabaseConfig.publishableKey,
   );
 
   runApp(const SafarMateApp());

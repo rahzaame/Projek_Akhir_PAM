@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'profile_page.dart';
-import 'database_test_page.dart';
 import 'login_page.dart';
 import 'packages_page.dart';
 import 'booking_history_page.dart';

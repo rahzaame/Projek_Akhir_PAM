@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import 'dashboard_page.dart';
 import 'register_page.dart';
-import 'package:local_auth/local_auth.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
