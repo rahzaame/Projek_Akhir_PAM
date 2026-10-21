@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 const Color safarGreen = Color(0xFF176B50);
 const Color safarLightGreen = Color(0xFFE1F2E8);
@@ -68,7 +69,7 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
       );
 
       final data = response.data;
-      final answer = data is Map ? data['reply']?.toString() : null;
+      final answer = data is Map ? data['answer']?.toString() : null;
 
       if (response.status < 200 ||
           response.status >= 300 ||
@@ -157,13 +158,57 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
                       color: message.isUser ? safarGreen : Colors.white,
                       borderRadius: BorderRadius.circular(15),
                     ),
-                    child: Text(
-                      message.text,
-                      style: TextStyle(
-                        color: message.isUser ? Colors.white : Colors.black87,
-                        height: 1.45,
-                      ),
-                    ),
+
+                    child: message.isUser
+                        ? Text(
+                            message.text,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              height: 1.45,
+                            ),
+                          )
+                        : MarkdownBody(
+                            data: message.text,
+                            selectable: true,
+                            styleSheet: MarkdownStyleSheet(
+                              p: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                                height: 1.45,
+                              ),
+                              h1: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              h2: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              h3: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              h4: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              strong: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                              em: const TextStyle(
+                                fontStyle: FontStyle.italic,
+                                color: Colors.black87,
+                              ),
+                              listBullet: const TextStyle(
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
                   ),
                 );
               },
