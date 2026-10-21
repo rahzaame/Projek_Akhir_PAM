@@ -1,11 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/supabase_service.dart';
 import 'dashboard_page.dart';
 import 'register_page.dart';
-
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -47,9 +45,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const DashboardPage(),
-        ),
+        MaterialPageRoute(builder: (_) => const DashboardPage()),
         (route) => false,
       );
     } on AuthException catch (error) {
@@ -66,9 +62,7 @@ class _LoginPageState extends State<LoginPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Terjadi kesalahan. Periksa koneksi dan konfigurasi.',
-          ),
+          content: Text('Terjadi kesalahan. Periksa koneksi dan konfigurasi.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -80,11 +74,8 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _openRegister() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const RegisterPage(),
-      ),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const RegisterPage()));
   }
 
   @override
@@ -94,21 +85,14 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 28,
-              vertical: 24,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 12),
-                  const Icon(
-                    Icons.mosque_rounded,
-                    size: 76,
-                    color: _green,
-                  ),
+                  const Icon(Icons.mosque_rounded, size: 76, color: _green),
                   const SizedBox(height: 8),
                   const Text(
                     'SafarMate',
@@ -123,19 +107,13 @@ class _LoginPageState extends State<LoginPage> {
                   const Text(
                     'Teman Perjalanan Ibadahmu',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.black54,
-                    ),
+                    style: TextStyle(fontSize: 15, color: Colors.black54),
                   ),
                   const SizedBox(height: 36),
                   const Text(
                     'Masuk ke akun Anda',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 24),
 
@@ -153,9 +131,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(13),
-                        borderSide: BorderSide(
-                          color: Colors.grey.shade300,
-                        ),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
                     ),
                     validator: (value) {
@@ -165,9 +141,8 @@ class _LoginPageState extends State<LoginPage> {
                         return 'Email wajib diisi';
                       }
 
-                      if (!RegExp(
-                        r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                      ).hasMatch(email)) {
+                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                          .hasMatch(email)) {
                         return 'Masukkan email yang valid';
                       }
 
@@ -205,9 +180,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(13),
-                        borderSide: BorderSide(
-                          color: Colors.grey.shade300,
-                        ),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
                     ),
                     validator: (value) {
@@ -271,11 +244,10 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 22),
 
+
                   Row(
                     children: [
-                      Expanded(
-                        child: Divider(color: Colors.grey.shade300),
-                      ),
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 14),
                         child: Text(
@@ -283,9 +255,7 @@ class _LoginPageState extends State<LoginPage> {
                           style: TextStyle(color: Colors.black54),
                         ),
                       ),
-                      Expanded(
-                        child: Divider(color: Colors.grey.shade300),
-                      ),
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
                     ],
                   ),
                   const SizedBox(height: 20),

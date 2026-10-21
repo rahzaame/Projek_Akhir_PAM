@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/biometric_preferences.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
 import 'packages_page.dart';
@@ -41,11 +42,81 @@ class _DashboardPageState extends State<DashboardPage> {
     'Profil',
   ];
 
+  final _biometricPreferences = BiometricPreferences();
+
+  bool _biometricEnabled = false;
+  bool _isLoadingBiometric = true;
+  bool _isUpdatingBiometric = false;
+
+  Future<void> _loadBiometricPreference() async {
+    try {
+      final enabled = await _biometricPreferences.isEnabled();
+
+      if (!mounted) return;
+
+      setState(() {
+        _biometricEnabled = enabled;
+        _isLoadingBiometric = false;
+      });
+    } catch (e) {
+      debugPrint('Gagal membaca pengaturan biometrik: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingBiometric = false;
+      });
+    }
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    if (_isUpdatingBiometric) return;
+
+    setState(() {
+      _isUpdatingBiometric = true;
+    });
+
+    try {
+      await _biometricPreferences.setEnabled(value);
+
+      if (!mounted) return;
+
+      setState(() {
+        _biometricEnabled = value;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value
+                ? 'Login biometrik diaktifkan.'
+                : 'Login biometrik dinonaktifkan.',
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Gagal menyimpan pengaturan biometrik: $e');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mengubah pengaturan biometrik.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingBiometric = false;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadUserRole();
     _loadProfilePhoto();
+    _loadBiometricPreference();
   }
 
   Future<void> _loadUserRole() async {
@@ -644,6 +715,37 @@ class _DashboardPageState extends State<DashboardPage> {
           'Informasi Profil',
           'Edit nama, username, telepon, dan tanggal lahir',
           _openProfileDetails,
+        ),
+        Card(
+          elevation: 0,
+          color: Colors.white,
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: SwitchListTile(
+            secondary: const Icon(
+              Icons.fingerprint,
+              color: safarGreen,
+              size: 29,
+            ),
+            title: const Text(
+              'Login Biometrik',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              _isLoadingBiometric
+                  ? 'Memuat pengaturan...'
+                  : _biometricEnabled
+                  ? 'Aktif'
+                  : 'Nonaktif',
+            ),
+            value: _biometricEnabled,
+            onChanged: _isLoadingBiometric || _isUpdatingBiometric
+                ? null
+                : _toggleBiometric,
+            activeTrackColor: safarGreen,
+          ),
         ),
         _featureTile(
           Icons.feedback_outlined,
