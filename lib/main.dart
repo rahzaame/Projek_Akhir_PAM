@@ -1,4 +1,6 @@
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,10 +11,11 @@ import 'pages/reset_password_page.dart';
 import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
 
-// Navigator global untuk membuka halaman reset password
-// dari event autentikasi Supabase.
 final GlobalKey<NavigatorState> appNavigatorKey =
     GlobalKey<NavigatorState>();
+
+StreamSubscription<AuthState>? _authSubscription;
+bool _resetPageOpening = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,31 +25,47 @@ Future<void> main() async {
     publishableKey: SupabaseConfig.publishableKey,
   );
 
-  // Dengarkan event pemulihan password dari Supabase.
-  Supabase.instance.client.auth.onAuthStateChange.listen(
+  // Dengarkan event autentikasi, termasuk pemulihan password.
+  _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
     (authState) {
       if (authState.event == AuthChangeEvent.passwordRecovery) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final navigator = appNavigatorKey.currentState;
-
-          if (navigator == null) {
-            debugPrint(
-              'Navigator belum siap untuk halaman reset password.',
-            );
-            return;
-          }
-
-          navigator.push(
-            MaterialPageRoute(
-              builder: (_) => const ResetPasswordPage(),
-            ),
-          );
-        });
+        _openResetPasswordPage();
       }
+    },
+    onError: (Object error, StackTrace stackTrace) {
+      debugPrint('Auth state error: $error');
     },
   );
 
   runApp(const SafarMateApp());
+}
+
+void _openResetPasswordPage() {
+  if (_resetPageOpening) return;
+
+  _resetPageOpening = true;
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final navigator = appNavigatorKey.currentState;
+
+    if (navigator == null) {
+      debugPrint(
+        'Navigator belum siap. Event reset password diterima.',
+      );
+      _resetPageOpening = false;
+      return;
+    }
+
+    navigator
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => const ResetPasswordPage(),
+          ),
+        )
+        .whenComplete(() {
+          _resetPageOpening = false;
+        });
+  });
 }
 
 class SafarMateApp extends StatelessWidget {
@@ -94,7 +113,6 @@ class _AuthGateState extends State<AuthGate>
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addObserver(this);
     _checkAccess();
   }
@@ -106,9 +124,7 @@ class _AuthGateState extends State<AuthGate>
   }
 
   @override
-  void didChangeAppLifecycleState(
-    AppLifecycleState state,
-  ) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
@@ -135,7 +151,6 @@ class _AuthGateState extends State<AuthGate>
       final client = Supabase.instance.client;
       final session = client.auth.currentSession;
 
-      // Belum login ke Supabase.
       if (session == null) {
         if (!mounted) return;
 
@@ -147,10 +162,8 @@ class _AuthGateState extends State<AuthGate>
         return;
       }
 
-      // Periksa apakah fitur biometrik diaktifkan.
       final enabled = await _preferences.isEnabled();
 
-      // Jika nonaktif, gunakan sesi login Supabase.
       if (!enabled) {
         if (!mounted) return;
 
@@ -162,7 +175,6 @@ class _AuthGateState extends State<AuthGate>
         return;
       }
 
-      // Jika aktif, wajib verifikasi biometrik.
       final authenticated = await _biometric.authenticate();
 
       if (!mounted) return;
@@ -173,9 +185,7 @@ class _AuthGateState extends State<AuthGate>
         _needsAuthentication = !authenticated;
       });
     } catch (e) {
-      debugPrint(
-        'Gagal memeriksa akses biometrik: $e',
-      );
+      debugPrint('Gagal memeriksa akses biometrik: $e');
 
       if (!mounted) return;
 
@@ -192,12 +202,10 @@ class _AuthGateState extends State<AuthGate>
     final session =
         Supabase.instance.client.auth.currentSession;
 
-    // Tidak ada sesi login: tampilkan halaman login.
     if (session == null) {
       return const LoginPage();
     }
 
-    // Sedang memeriksa akses.
     if (_checking) {
       return const Scaffold(
         body: Center(
@@ -206,13 +214,10 @@ class _AuthGateState extends State<AuthGate>
       );
     }
 
-    // Verifikasi berhasil atau biometrik dinonaktifkan.
     if (_unlocked) {
       return const DashboardPage();
     }
 
-    // Verifikasi gagal atau dibatalkan:
-    // dashboard tetap terkunci.
     return Scaffold(
       body: Center(
         child: Padding(
@@ -220,10 +225,7 @@ class _AuthGateState extends State<AuthGate>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.fingerprint,
-                size: 64,
-              ),
+              const Icon(Icons.fingerprint, size: 64),
               const SizedBox(height: 16),
               const Text(
                 'Verifikasi biometrik untuk membuka SafarMate',
@@ -231,8 +233,7 @@ class _AuthGateState extends State<AuthGate>
               ),
               const SizedBox(height: 16),
               FilledButton(
-                onPressed:
-                    _checking ? null : _checkAccess,
+                onPressed: _checking ? null : _checkAccess,
                 child: const Text('Coba Lagi'),
               ),
             ],

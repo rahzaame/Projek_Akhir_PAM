@@ -11,6 +11,8 @@ class ResetPasswordPage extends StatefulWidget {
 }
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
+  static const Color _green = Color(0xFF176B50);
+
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -36,6 +38,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Password berhasil diperbarui!'),
+          backgroundColor: _green,
         ),
       );
 
@@ -44,7 +47,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: _green,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -54,6 +60,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           content: Text(
             'Gagal memperbarui password. Silakan coba lagi.',
           ),
+          backgroundColor: _green,
         ),
       );
 
@@ -74,11 +81,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    const green = Color(0xFF2E7D32);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Buat Password Baru'),
+        backgroundColor: _green,
+        foregroundColor: Colors.white,
       ),
       body: SafeArea(
         child: Center(
@@ -92,7 +99,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   const Icon(
                     Icons.lock_reset_rounded,
                     size: 72,
-                    color: green,
+                    color: _green,
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -101,6 +108,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
+                      color: _green,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -114,13 +122,26 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     obscureText: _hidePassword,
                     decoration: InputDecoration(
                       labelText: 'Password baru',
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      labelStyle: const TextStyle(
+                        color: _green,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.lock_outline,
+                        color: _green,
+                      ),
                       border: const OutlineInputBorder(),
+                      focusedBorder: const OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: _green,
+                          width: 2,
+                        ),
+                      ),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _hidePassword
                               ? Icons.visibility_off
                               : Icons.visibility,
+                          color: _green,
                         ),
                         onPressed: () {
                           setState(() {
@@ -145,13 +166,26 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     obscureText: _hideConfirmPassword,
                     decoration: InputDecoration(
                       labelText: 'Konfirmasi password',
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      labelStyle: const TextStyle(
+                        color: _green,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.lock_outline,
+                        color: _green,
+                      ),
                       border: const OutlineInputBorder(),
+                      focusedBorder: const OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: _green,
+                          width: 2,
+                        ),
+                      ),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _hideConfirmPassword
                               ? Icons.visibility_off
                               : Icons.visibility,
+                          color: _green,
                         ),
                         onPressed: () {
                           setState(() {
@@ -178,8 +212,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       onPressed:
                           _isLoading ? null : _savePassword,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: green,
+                        backgroundColor: _green,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor:
+                            _green.withValues(alpha: 0.6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: _isLoading
                           ? const SizedBox(
