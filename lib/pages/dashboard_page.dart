@@ -35,6 +35,9 @@ class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
   bool _isAdmin = false;
 
+  String? _displayName;
+  bool _isLoadingName = true;
+
   String? _profilePhotoUrl;
   bool _isLoadingPhoto = true;
 
@@ -121,6 +124,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadUserRole();
     _loadProfilePhoto();
     _loadBiometricPreference();
+    _loadDisplayName();
   }
 
   Future<void> _loadUserRole() async {
@@ -142,6 +146,56 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     } catch (e) {
       debugPrint('Gagal memeriksa role pengguna: $e');
+    }
+  }
+
+  Future<void> _loadDisplayName() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) {
+      setState(() {
+        _isLoadingName = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final nameFromProfile = response?['full_name']?.toString().trim();
+
+      final nameFromMetadata = user.userMetadata?['full_name']
+          ?.toString()
+          .trim();
+
+      String? name;
+
+      if (nameFromProfile != null && nameFromProfile.isNotEmpty) {
+        name = nameFromProfile;
+      } else if (nameFromMetadata != null && nameFromMetadata.isNotEmpty) {
+        name = nameFromMetadata;
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _displayName = name;
+        _isLoadingName = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      debugPrint('Gagal memuat nama pengguna: $e');
+
+      setState(() {
+        _displayName = null;
+        _isLoadingName = false;
+      });
     }
   }
 

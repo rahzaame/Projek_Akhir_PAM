@@ -277,27 +277,27 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _lightGreen,
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.explore_outlined, color: _green),
-                        SizedBox(width: 10),
-                        Flexible(
-                          child: Text(
-                            'Temani perjalanan ibadahmu bersama SafarMate.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: _green),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Container(
+                  //   padding: const EdgeInsets.all(16),
+                  //   decoration: BoxDecoration(
+                  //     color: _lightGreen,
+                  //     borderRadius: BorderRadius.circular(13),
+                  //   ),
+                  //   child: const Row(
+                  //     mainAxisAlignment: MainAxisAlignment.center,
+                  //     children: [
+                  //       Icon(Icons.explore_outlined, color: _green),
+                  //       SizedBox(width: 10),
+                  //       Flexible(
+                  //         child: Text(
+                  //           'Temani perjalanan ibadahmu bersama SafarMate.',
+                  //           textAlign: TextAlign.center,
+                  //           style: TextStyle(color: _green),
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
                 ],
               ),
             ),
