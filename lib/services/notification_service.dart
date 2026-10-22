@@ -7,7 +7,6 @@ import '../utils/format_utils.dart';
 import 'schedule_service.dart';
 import 'timezone_service.dart';
 
-/// Pengaturan notifikasi yang disimpan di perangkat.
 class NotificationPrefs {
   final bool scheduleEnabled;
   final bool departureEnabled;
@@ -48,8 +47,6 @@ class NotificationService {
   static const String _checklistStorageKey =
       'safarmate_checklist_completed_items';
 
-  /// Pengingat harian checklist mengikuti jam WIB (tidak memakai zona
-  /// perangkat supaya tidak perlu package tambahan).
   static const String _reminderZone = 'Asia/Jakarta';
 
   static const String _prefScheduleEnabled = 'notif_schedule_enabled';
@@ -160,14 +157,12 @@ class NotificationService {
       final prefs = await loadPrefs();
       final service = ScheduleService();
 
-      // 1. Jadwal kegiatan
       await _cancelByPayload(_payloadSchedule);
       if (prefs.scheduleEnabled) {
         final schedules = await service.fetchSchedules();
         await _scheduleManyReminders(schedules);
       }
 
-      // 2. Keberangkatan
       await _cancelByPayload(_payloadDeparture);
       if (prefs.departureEnabled) {
         final trips = await service.fetchTrips();
@@ -176,7 +171,6 @@ class NotificationService {
         }
       }
 
-      // 3. Checklist
       await _cancelByPayload(_payloadChecklist);
       if (prefs.checklistEnabled) {
         await _scheduleChecklistReminder(prefs);
@@ -186,13 +180,11 @@ class NotificationService {
     }
   }
 
-  /// Jumlah pengingat yang sedang terjadwal.
   Future<int> pendingCount() async {
     if (!_ready) return 0;
     return (await _plugin.pendingNotificationRequests()).length;
   }
 
-  /// Notifikasi percobaan (langsung tampil).
   Future<void> showTest() async {
     if (!_ready) return;
     await _plugin.show(
@@ -203,9 +195,6 @@ class NotificationService {
     );
   }
 
-  // ---------------------------------------------------- JADWAL KEGIATAN
-  /// Menjadwalkan / menjadwalkan ulang pengingat untuk satu jadwal.
-  /// Dipanggil setelah menambah atau mengubah jadwal.
   Future<void> scheduleReminderFor(Map<String, dynamic> schedule) async {
     if (!_ready) return;
     try {
@@ -238,7 +227,6 @@ class NotificationService {
 
     upcoming.sort((a, b) => a.key.compareTo(b.key));
 
-    // iOS membatasi 64 notifikasi terjadwal, ambil yang terdekat saja.
     for (final entry in upcoming.take(50)) {
       await _scheduleOneReminder(entry.value);
     }
@@ -273,8 +261,6 @@ class NotificationService {
     );
   }
 
-  /// Waktu pengingat (instant absolut) atau `null` bila jadwal tidak
-  /// punya jam / tidak punya pengingat.
   static DateTime? reminderTime(Map<String, dynamic> schedule) {
     final minutes = (schedule['reminder_minutes'] as num?)?.toInt();
     final date = parseDbDate(schedule['schedule_date']);
@@ -298,7 +284,6 @@ class NotificationService {
     return '$minutes menit';
   }
 
-  // --------------------------------------------------------- KEBERANGKATAN
   Future<void> _scheduleDepartureReminders(Map<String, dynamic> trip) async {
     final departure = parseDbDate(trip['departure_date']);
     if (departure == null) return;
@@ -353,13 +338,10 @@ class NotificationService {
     }
   }
 
-  // ------------------------------------------------------------ CHECKLIST
   Future<void> _scheduleChecklistReminder(NotificationPrefs prefs) async {
     final shared = await SharedPreferences.getInstance();
     final done =
         (shared.getStringList(_checklistStorageKey) ?? const <String>[]).length;
-
-    // Checklist sudah lengkap: tidak perlu mengingatkan lagi.
     if (done >= checklistTotalItems) return;
 
     final location = TimezoneService.location(_reminderZone);
@@ -384,11 +366,10 @@ class NotificationService {
           'Baru $done dari $checklistTotalItems persiapan selesai. '
           'Yuk lengkapi hari ini!',
       payload: _payloadChecklist,
-      matchDateTimeComponents: DateTimeComponents.time, // ulang setiap hari
+      matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
-  // -------------------------------------------------------------- HELPERS
   Future<void> _zoned({
     required int id,
     required DateTime when,
@@ -430,8 +411,6 @@ class NotificationService {
     );
   }
 
-  /// ID notifikasi (int 31-bit) yang stabil dari sebuah string (FNV-1a).
-  /// `String.hashCode` tidak dijamin sama antar-versi Dart, jadi tidak dipakai.
   static int _stableId(String key) {
     int hash = 0x811c9dc5;
     for (final unit in key.codeUnits) {

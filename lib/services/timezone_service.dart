@@ -1,11 +1,10 @@
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-/// Zona waktu yang didukung SafarMate.
 class TravelZone {
-  final String code; // label singkat: WIB, WITA, ...
-  final String name; // nama tampilan
-  final String tzId; // ID IANA
+  final String code;
+  final String name;
+  final String tzId;
   final String note;
 
   const TravelZone({
@@ -16,11 +15,10 @@ class TravelZone {
   });
 }
 
-/// Hasil konversi waktu ke satu zona.
 class ZoneTime {
   final TravelZone zone;
   final tz.TZDateTime time;
-  final int dayDifference; // -1 = hari sebelumnya, +1 = hari berikutnya
+  final int dayDifference;
 
   const ZoneTime({
     required this.zone,
@@ -28,7 +26,6 @@ class ZoneTime {
     required this.dayDifference,
   });
 
-  /// Contoh: "UTC+7", "UTC+5:30".
   String get utcLabel {
     final offset = time.timeZoneOffset;
     final sign = offset.isNegative ? '-' : '+';
@@ -39,8 +36,6 @@ class ZoneTime {
   }
 }
 
-/// Konversi zona waktu. Memakai database IANA (package `timezone`)
-/// sehingga perubahan jam musim panas London (GMT/BST) ikut terhitung.
 class TimezoneService {
   TimezoneService._();
 
@@ -58,19 +53,19 @@ class TimezoneService {
       code: 'WIB',
       name: 'Waktu Indonesia Barat',
       tzId: 'Asia/Jakarta',
-      note: 'Jakarta, Purwokerto',
+      note: 'Jakarta',
     ),
     TravelZone(
       code: 'WITA',
       name: 'Waktu Indonesia Tengah',
       tzId: 'Asia/Makassar',
-      note: 'Makassar, Bali',
+      note: 'Makassar',
     ),
     TravelZone(
       code: 'WIT',
       name: 'Waktu Indonesia Timur',
       tzId: 'Asia/Jayapura',
-      note: 'Jayapura, Ambon',
+      note: 'Jayapura',
     ),
     TravelZone(
       code: 'London',
@@ -84,7 +79,6 @@ class TimezoneService {
       tzId: 'Asia/Riyadh',
       note: 'Makkah, Madinah',
     ),
-    // Tambahan untuk paket Umrah Plus Turki.
     TravelZone(
       code: 'Turki',
       name: 'Turki (TRT)',
@@ -102,13 +96,11 @@ class TimezoneService {
     return tz.getLocation(tzId);
   }
 
-  /// Waktu saat ini di zona tertentu.
   static tz.TZDateTime nowIn(String tzId) {
     ensureInitialized();
     return tz.TZDateTime.now(location(tzId));
   }
 
-  /// Membuat waktu "dinding" ([year]-[month]-[day] [hour]:[minute]) di [tzId].
   static tz.TZDateTime wallTime(
     String tzId,
     int year,
@@ -120,7 +112,6 @@ class TimezoneService {
     return tz.TZDateTime(location(tzId), year, month, day, hour, minute);
   }
 
-  /// Konversi satu waktu ke semua zona.
   static List<ZoneTime> convertToAll(tz.TZDateTime source) {
     ensureInitialized();
     final sourceDay = DateTime.utc(source.year, source.month, source.day);
@@ -140,7 +131,6 @@ class TimezoneService {
     }).toList();
   }
 
-  /// Konversi ke satu zona.
   static tz.TZDateTime convert(tz.TZDateTime source, String targetTzId) {
     ensureInitialized();
     return tz.TZDateTime.from(source, location(targetTzId));

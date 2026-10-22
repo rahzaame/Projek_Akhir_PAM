@@ -581,7 +581,7 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
   late DateTime _date;
   TimeOfDay? _time;
   late String _timezone;
-  late int _reminder; // -1 = tanpa pengingat
+  late int _reminder;
 
   @override
   void initState() {
@@ -653,7 +653,7 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
         timezone: _timezone,
         location: _location.text.trim(),
         description: _description.text.trim(),
-        // Pengingat hanya bermakna bila jadwal punya jam.
+
         reminderMinutes: (_time == null || _reminder < 0) ? null : _reminder,
       ),
     );

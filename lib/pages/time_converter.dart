@@ -5,9 +5,7 @@ import 'package:flutter/material.dart';
 import '../services/timezone_service.dart';
 import '../utils/format_utils.dart';
 
-/// Konversi zona waktu: WIB, WITA, WIT, London, Arab Saudi (+ Turki).
 class TimeConverterPage extends StatefulWidget {
-  /// Opsional: dipakai saat dibuka dari kartu jadwal.
   final DateTime? initialDate;
   final TimeOfDay? initialTime;
   final String? initialZoneId;
@@ -31,7 +29,6 @@ class _TimeConverterPageState extends State<TimeConverterPage> {
   late DateTime _date;
   late TimeOfDay _time;
 
-  /// Jika true, jam mengikuti waktu sekarang dan berdetak setiap detik.
   bool _live = false;
   Timer? _ticker;
 
@@ -133,7 +130,6 @@ class _TimeConverterPageState extends State<TimeConverterPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ------------------------------------------------ INPUT
           Card(
             elevation: 0,
             color: Colors.white,
@@ -208,7 +204,6 @@ class _TimeConverterPageState extends State<TimeConverterPage> {
           ),
           const SizedBox(height: 16),
 
-          // ------------------------------------------------ HASIL
           const Padding(
             padding: EdgeInsets.only(left: 4, bottom: 8),
             child: Text(
@@ -227,21 +222,7 @@ class _TimeConverterPageState extends State<TimeConverterPage> {
             color: Color(0xFFFFF4D8),
             child: Padding(
               padding: EdgeInsets.all(14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: Colors.brown),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'London memakai jam musim panas (BST, UTC+1) pada akhir '
-                      'Maret hingga akhir Oktober, dan GMT (UTC+0) di luar '
-                      'itu. Perhitungan sudah menyesuaikan otomatis.',
-                      style: TextStyle(height: 1.4, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start),
             ),
           ),
         ],
