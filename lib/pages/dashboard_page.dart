@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/biometric_preferences.dart';
+import 'admin_voucher_page.dart';
+import 'riwayat_blockchain_page.dart';
+import 'admin_voucher_page.dart';
+import 'riwayat_blockchain_page.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
 import 'packages_page.dart';
@@ -656,12 +660,20 @@ class _DashboardPageState extends State<DashboardPage> {
           'Catat kebutuhan selama perjalanan',
           () => _showComingSoon('Catatan Pengeluaran'),
         ),
-        _featureTile(
-          Icons.link_rounded,
-          'Riwayat Blockchain',
-          'Konsep pencatatan transaksi sederhana',
-          () => _showComingSoon('Riwayat Blockchain'),
-        ),
+        if (!_isAdmin)
+          _featureTile(
+            Icons.verified_user_outlined,
+            'Voucher Saya',
+            'Lihat dan unduh voucher perjalanan Anda',
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RiwayatBlockchainPage(),
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -765,15 +777,35 @@ class _DashboardPageState extends State<DashboardPage> {
           'Pengaturan aplikasi dan akun',
           () => _showComingSoon('Pengaturan'),
         ),
-        _featureTile(
-          Icons.verified_user_outlined,
-          'Riwayat Blockchain',
-          'Lihat catatan transaksi digital',
-          () => _showComingSoon('Riwayat Blockchain'),
-        ),
+        // Hanya muncul untuk akun jamaah (bukan admin).
+        if (!_isAdmin)
+          _featureTile(
+            Icons.verified_user_outlined,
+            'Voucher Saya',
+            'Lihat dan unduh voucher perjalanan Anda',
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RiwayatBlockchainPage(),
+                ),
+              );
+            },
+          ),
 
-        // Kedua menu ini hanya muncul untuk akun admin.
+        // Menu khusus akun admin.
         if (_isAdmin) ...[
+          _featureTile(
+            Icons.card_giftcard,
+            'Kelola Voucher Blockchain',
+            'Buat dan verifikasi voucher PDF',
+            () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminVoucherPage()),
+              );
+            },
+          ),
           _featureTile(
             Icons.inventory_2_outlined,
             'Kelola Paket Umrah',
@@ -787,6 +819,8 @@ class _DashboardPageState extends State<DashboardPage> {
             _openAdminItinerary,
           ),
         ],
+
+        const SizedBox(height: 20),
 
         const SizedBox(height: 20),
         OutlinedButton.icon(
