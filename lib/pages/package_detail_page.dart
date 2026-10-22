@@ -117,17 +117,28 @@ class PackageDetailPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Gambar paket
-                if (imageUrl.isNotEmpty)
-                  Image.network(
-                    imageUrl,
-                    width: double.infinity,
-                    height: 230,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                  )
-                else
-                  _imagePlaceholder(),
+                // Gambar mengikuti rasio aslinya tanpa dipotong.
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(
+                    minHeight: 120,
+                    maxHeight: 360,
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: imageUrl.isNotEmpty
+                      ? Image.network(
+                          imageUrl,
+                          fit: BoxFit.contain,
+                          alignment: Alignment.center,
+                          width: double.infinity,
+                          errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                        )
+                      : _imagePlaceholder(),
+                ),
 
                 Padding(
                   padding: const EdgeInsets.all(20),
@@ -566,7 +577,7 @@ class PackageDetailPage extends StatelessWidget {
   Widget _imagePlaceholder() {
     return Container(
       width: double.infinity,
-      height: 230,
+      height: 180,
       color: safarLightGreen,
       child: const Icon(Icons.mosque_outlined, size: 85, color: safarGreen),
     );

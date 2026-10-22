@@ -577,20 +577,19 @@ class _PackagesPageState extends State<PackagesPage> {
     );
   }
 
-  Widget _buildImage(Map<String, dynamic> package) {
-    final url = package['image_url']?.toString() ?? '';
+  Widget _buildPackageImage(Map<String, dynamic> package) {
+    final imageUrl = package['image_url']?.toString().trim() ?? '';
 
-    if (url.isNotEmpty) {
-      return Image.network(
-        url,
-        width: double.infinity,
-        height: 175,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildPlaceholder(),
-      );
+    if (imageUrl.isEmpty) {
+      return _buildPlaceholder();
     }
 
-    return _buildPlaceholder();
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      errorBuilder: (_, __, ___) => _buildPlaceholder(),
+    );
   }
 
   Widget _buildPlaceholder() {
@@ -680,166 +679,185 @@ class _PackagesPageState extends State<PackagesPage> {
     final advantages = package['advantages']?.toString() ?? '';
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       color: Colors.white,
       elevation: 2,
       shadowColor: Colors.black.withValues(alpha: 0.05),
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: () => _openPackageDetail(package),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                _buildImage(package),
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      type,
-                      style: const TextStyle(
-                        color: green,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+        child: SizedBox(
+          height: 224,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Gambar paket di sebelah kiri.
+              SizedBox(
+                width: 124,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildPackageImage(package),
+                    Positioned(
+                      left: 7,
+                      right: 7,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Text(
+                          type,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: green,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Text(
-                      '$duration Hari',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (airline.isNotEmpty) ...[
-                    _buildInfoItem(Icons.flight_rounded, airline),
-                    const SizedBox(height: 8),
-                  ],
-                  _buildInfoItem(
-                    Icons.calendar_month_outlined,
-                    _formatDate(date),
-                  ),
-                  if (advantages.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      advantages,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 12,
-                        height: 1.5,
+                    Positioned(
+                      left: 7,
+                      bottom: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Text(
+                          '$duration Hari',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ],
-                  const SizedBox(height: 14),
-                  const Divider(height: 1),
-                  const SizedBox(height: 14),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                ),
+              ),
+
+              // Informasi paket di sebelah kanan.
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Mulai dari',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatPrice(package['price']),
-                              style: const TextStyle(
-                                color: green,
-                                fontSize: 19,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'per orang',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
+                      Text(
+                        name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.2,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: () => _openPackageDetail(package),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(11),
+                      const SizedBox(height: 8),
+
+                      if (airline.isNotEmpty) ...[
+                        _buildInfoItem(Icons.flight_rounded, airline),
+                        const SizedBox(height: 6),
+                      ],
+
+                      _buildInfoItem(
+                        Icons.calendar_month_outlined,
+                        _formatDate(date),
+                      ),
+
+                      if (advantages.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          advantages,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontSize: 10,
+                            height: 1.25,
                           ),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('Lihat Detail'),
-                            SizedBox(width: 4),
-                            Icon(Icons.arrow_forward_rounded, size: 16),
-                          ],
+                      ],
+
+                      // Harga diletakkan lebih dekat dengan deskripsi.
+                      const SizedBox(height: 8),
+                      Text(
+                        'Mulai dari',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 10,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatPrice(package['price']),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: green,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // Tombol lebih kecil dan rata kanan.
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: SizedBox(
+                          height: 29,
+                          child: FilledButton(
+                            onPressed: () => _openPackageDetail(package),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 0,
+                              ),
+                              minimumSize: const Size(0, 29),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Lihat Detail',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(Icons.arrow_forward_rounded, size: 13),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -391,9 +391,16 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               _homeShortcut(
                 Icons.auto_awesome_rounded,
-                'Asisten AI',
+                'SafarMate AI',
                 'Tanya seputar Umrah',
-                () => setState(() => _selectedIndex = 1),
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TanyaSafarMateAiPage(),
+                    ),
+                  );
+                },
               ),
               _homeShortcut(
                 Icons.flight_takeoff_rounded,
