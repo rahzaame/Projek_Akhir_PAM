@@ -439,11 +439,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildHome() {
-    final user = Supabase.instance.client.auth.currentUser;
-    final displayName = user?.userMetadata?['full_name']?.toString().trim();
-
-    final greetingName = displayName != null && displayName.isNotEmpty
-        ? displayName
+    final greetingName = (_displayName != null && _displayName!.isNotEmpty)
+        ? _displayName!
         : 'Sahabat SafarMate';
 
     return SingleChildScrollView(
@@ -765,8 +762,8 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
 
             title: Text(
-              name != null && name.trim().isNotEmpty
-                  ? name
+              _displayName != null && _displayName!.trim().isNotEmpty
+                  ? _displayName!
                   : 'Pengguna SafarMate',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
