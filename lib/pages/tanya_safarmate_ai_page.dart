@@ -16,6 +16,8 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  final _supabase = Supabase.instance.client;
+
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
       text:
@@ -27,6 +29,13 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
   ];
 
   bool _isLoading = false;
+  bool _isLoadingHistory = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
 
   @override
   void dispose() {
@@ -37,33 +46,137 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
+      if (!_scrollController.hasClients) return;
+
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  // Memuat riwayat berdasarkan akun yang sedang login.
+  Future<void> _loadHistory() async {
+    try {
+      final user = _supabase.auth.currentUser;
+
+      if (user == null) return;
+
+      final rows = await _supabase
+          .from('safarmate_ai_messages')
+          .select('id, role, content, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: true)
+          .order('id', ascending: true);
+
+      if (!mounted) return;
+
+      final history = rows.map<_ChatMessage>((row) {
+        return _ChatMessage(
+          text: row['content'] as String,
+          isUser: row['role'] == 'user',
+        );
+      }).toList();
+
+      // Jika ada riwayat, tampilkan percakapan dari database.
+      // Jika kosong, pesan pembuka tetap ditampilkan.
+      if (history.isNotEmpty) {
+        setState(() {
+          _messages
+            ..clear()
+            ..addAll(history);
+        });
+
+        _scrollToBottom();
+      }
+    } catch (error) {
+      debugPrint('Gagal memuat riwayat chat: $error');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Riwayat chat gagal dimuat. Periksa koneksi dan coba lagi.',
+            ),
+          ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingHistory = false);
+      }
+    }
+  }
+
+  // Menyimpan pesan ke database sesuai akun yang login.
+  Future<void> _saveMessage({
+    required String userId,
+    required String role,
+    required String content,
+  }) async {
+    await _supabase.from('safarmate_ai_messages').insert({
+      'user_id': userId,
+      'role': role,
+      'content': content,
     });
   }
 
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
 
-    if (text.isEmpty || _isLoading) return;
+    if (text.isEmpty || _isLoading || _isLoadingHistory) return;
+
+    final user = _supabase.auth.currentUser;
+
+    // Pastikan pesan memiliki akun pemilik.
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sesi login tidak ditemukan. Silakan login kembali.'),
+        ),
+      );
+      return;
+    }
+
+    final userId = user.id;
 
     setState(() {
       _messages.add(_ChatMessage(text: text, isUser: true));
       _controller.clear();
       _isLoading = true;
     });
+
     _scrollToBottom();
 
+    // Simpan pertanyaan terlebih dahulu.
     try {
-      // Memanggil Supabase Edge Function.
-      // Fungsi ini perlu dibuat dan dihubungkan ke Gemini
-      // sebelum jawaban AI benar-benar tersedia.
-      final response = await Supabase.instance.client.functions.invoke(
+      await _saveMessage(userId: userId, role: 'user', content: text);
+    } catch (error) {
+      debugPrint('Gagal menyimpan pertanyaan: $error');
+
+      if (mounted) {
+        setState(() {
+          _messages.add(
+            const _ChatMessage(
+              text:
+                  'Pertanyaan belum berhasil disimpan. '
+                  'Periksa koneksi dan izin database, lalu coba lagi.',
+              isUser: false,
+            ),
+          );
+          _isLoading = false;
+        });
+
+        _scrollToBottom();
+      }
+
+      return;
+    }
+
+    try {
+      // Memanggil Edge Function SafarMate AI.
+      final response = await _supabase.functions.invoke(
         'safarmate-ai',
         body: {'message': text},
       );
@@ -78,12 +191,37 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
         throw Exception('Respons AI tidak tersedia.');
       }
 
+      final answerText = answer.trim();
+
+      // Jawaban tetap ditampilkan meskipun penyimpanan jawaban gagal.
+      try {
+        await _saveMessage(
+          userId: userId,
+          role: 'assistant',
+          content: answerText,
+        );
+      } catch (error) {
+        debugPrint('Gagal menyimpan jawaban AI: $error');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Jawaban tampil, tetapi gagal disimpan ke riwayat.',
+              ),
+            ),
+          );
+        }
+      }
+
       if (!mounted) return;
 
       setState(() {
-        _messages.add(_ChatMessage(text: answer.trim(), isUser: false));
+        _messages.add(_ChatMessage(text: answerText, isUser: false));
       });
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Gagal mendapatkan jawaban AI: $error');
+
       if (!mounted) return;
 
       setState(() {
@@ -92,7 +230,7 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
             text:
                 'Maaf, SafarMate AI belum dapat menjawab saat ini. '
                 'Pastikan koneksi internet tersedia dan layanan AI '
-                'sudah dikonfigurasi, lalu coba lagi.',
+                'berfungsi, lalu coba lagi.',
             isUser: false,
           ),
         );
@@ -116,6 +254,8 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
       ),
       body: Column(
         children: [
+          if (_isLoadingHistory)
+            const LinearProgressIndicator(color: safarGreen, minHeight: 2),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -158,7 +298,6 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
                       color: message.isUser ? safarGreen : Colors.white,
                       borderRadius: BorderRadius.circular(15),
                     ),
-
                     child: message.isUser
                         ? Text(
                             message.text,
@@ -244,7 +383,9 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: _isLoading ? null : _sendMessage,
+                    onPressed: _isLoading || _isLoadingHistory
+                        ? null
+                        : _sendMessage,
                     style: IconButton.styleFrom(
                       backgroundColor: safarGreen,
                       foregroundColor: Colors.white,
