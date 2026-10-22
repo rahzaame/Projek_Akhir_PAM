@@ -12,11 +12,10 @@ class AppCurrency {
   const AppCurrency(this.code, this.name, this.flag);
 }
 
-/// Kurs: berapa satuan mata uang X untuk 1 IDR.
 class CurrencyRates {
   final Map<String, double> perIdr;
-  final DateTime updatedAt; // waktu kurs terakhir diperbarui oleh penyedia
-  final DateTime fetchedAt; // waktu aplikasi mengambil kurs ini
+  final DateTime updatedAt;
+  final DateTime fetchedAt;
   final bool fromCache;
 
   const CurrencyRates({
@@ -26,7 +25,6 @@ class CurrencyRates {
     required this.fromCache,
   });
 
-  /// Konversi [amount] dari [from] ke [to].
   double convert(double amount, String from, String to) {
     if (from == to) return amount;
     final fromRate = perIdr[from];
@@ -37,7 +35,6 @@ class CurrencyRates {
     return amount / fromRate * toRate;
   }
 
-  /// 1 [code] = berapa IDR.
   double idrPerUnit(String code) {
     final rate = perIdr[code];
     if (rate == null || rate == 0) {
@@ -55,9 +52,6 @@ class CurrencyException implements Exception {
   String toString() => message;
 }
 
-/// Mengambil kurs dari open.er-api.com (gratis, tanpa API key).
-/// Hasil disimpan di SharedPreferences sehingga tetap bisa dipakai offline
-/// (misalnya saat roaming di Arab Saudi tanpa internet).
 class CurrencyService {
   CurrencyService._();
   static final CurrencyService instance = CurrencyService._();
@@ -74,8 +68,6 @@ class CurrencyService {
 
   CurrencyRates? _memory;
 
-  /// Ambil kurs. Urutan: memori/cache segar -> API -> cache lama.
-  /// Melempar [CurrencyException] bila API gagal dan belum ada cache sama sekali.
   Future<CurrencyRates> getRates({bool forceRefresh = false}) async {
     if (!forceRefresh) {
       final cached = _memory ?? await _readCache();
@@ -183,8 +175,6 @@ class CurrencyService {
           'fetched_at': rates.fetchedAt.millisecondsSinceEpoch,
         }),
       );
-    } catch (_) {
-      // Cache gagal disimpan: abaikan, aplikasi tetap berjalan.
-    }
+    } catch (_) {}
   }
 }

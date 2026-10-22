@@ -5,7 +5,6 @@ import '../utils/format_utils.dart';
 
 const Color _green = Color(0xFF176B50);
 
-/// Pengaturan pengingat: jadwal, keberangkatan, dan checklist.
 class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
 
@@ -48,7 +47,6 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// Simpan pengaturan lalu jadwalkan ulang semua pengingat.
   Future<void> _update(NotificationPrefs next) async {
     setState(() => _prefs = next);
     await _service.savePrefs(next);

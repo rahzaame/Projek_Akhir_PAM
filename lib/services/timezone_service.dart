@@ -53,19 +53,19 @@ class TimezoneService {
       code: 'WIB',
       name: 'Waktu Indonesia Barat',
       tzId: 'Asia/Jakarta',
-      note: 'Jakarta, Purwokerto',
+      note: 'Jakarta',
     ),
     TravelZone(
       code: 'WITA',
       name: 'Waktu Indonesia Tengah',
       tzId: 'Asia/Makassar',
-      note: 'Makassar, Bali',
+      note: 'Makassar',
     ),
     TravelZone(
       code: 'WIT',
       name: 'Waktu Indonesia Timur',
       tzId: 'Asia/Jayapura',
-      note: 'Jayapura, Ambon',
+      note: 'Jayapura',
     ),
     TravelZone(
       code: 'London',

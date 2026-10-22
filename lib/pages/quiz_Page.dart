@@ -577,7 +577,6 @@ class _QuizPageState extends State<QuizPage> {
     );
   }
 
-  // ------------------------------------------------------------- RESULT
   Widget _buildResult() {
     final total = _questions.length;
     final score = total == 0 ? 0 : ((_correct / total) * 100).round();

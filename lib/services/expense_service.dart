@@ -4,25 +4,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/format_utils.dart';
 import 'currency_service.dart';
 
-/// Kategori pengeluaran beserta ikonnya didefinisikan di halaman UI;
-/// di sini hanya daftar nama yang disimpan ke database.
 const List<String> expenseCategories = [
   'Akomodasi',
   'Transportasi',
   'Makanan & Minuman',
-  'Oleh-oleh',
   'Belanja',
   'Donasi & Sedekah',
   'Komunikasi',
   'Lainnya',
 ];
 
-/// Ringkasan anggaran.
 class BudgetSummary {
   final double budgetIdr;
   final double spentIdr;
-  final Map<String, double> byCategory; // dalam IDR
-  final Map<String, double> byCurrency; // dalam mata uang asli
+  final Map<String, double> byCategory;
+  final Map<String, double> byCurrency;
 
   const BudgetSummary({
     required this.budgetIdr,
@@ -35,15 +31,10 @@ class BudgetSummary {
   bool get hasBudget => budgetIdr > 0;
   bool get isOverBudget => hasBudget && spentIdr > budgetIdr;
 
-  /// 0.0 - 1.0 (dibatasi), untuk progress bar.
   double get usedFraction =>
       hasBudget ? (spentIdr / budgetIdr).clamp(0.0, 1.0) : 0.0;
 }
 
-/// CRUD tabel `expenses` + pengelolaan anggaran.
-///
-/// Anggaran disimpan lokal (SharedPreferences) per pengguna karena tabel yang
-/// dikelola Anggota 3 hanya `schedules`, `expenses`, dan `quiz_results`.
 class ExpenseService {
   final SupabaseClient _client = Supabase.instance.client;
 
@@ -53,7 +44,6 @@ class ExpenseService {
     return user.id;
   }
 
-  // ---------------------------------------------------------------- READ
   Future<List<Map<String, dynamic>>> fetchExpenses() async {
     final response = await _client
         .from('expenses')
@@ -65,7 +55,6 @@ class ExpenseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // -------------------------------------------------------------- CREATE
   Future<void> addExpense({
     required String title,
     required double amount,
@@ -89,9 +78,6 @@ class ExpenseService {
     });
   }
 
-  // -------------------------------------------------------------- UPDATE
-  /// Jika nominal/mata uang berubah, nilai rupiah dihitung ulang dengan kurs
-  /// terbaru. Jika tidak berubah, kurs saat pencatatan awal dipertahankan.
   Future<void> updateExpense({
     required Map<String, dynamic> original,
     required String title,
@@ -125,12 +111,10 @@ class ExpenseService {
         .eq('user_id', _userId);
   }
 
-  // -------------------------------------------------------------- DELETE
   Future<void> deleteExpense(String id) async {
     await _client.from('expenses').delete().eq('id', id).eq('user_id', _userId);
   }
 
-  // -------------------------------------------------------------- BUDGET
   String get _budgetKey => 'safarmate_budget_idr_$_userId';
 
   Future<double> getBudget() async {
@@ -147,7 +131,6 @@ class ExpenseService {
     }
   }
 
-  /// Menghitung total pengeluaran & sisa anggaran.
   BudgetSummary summarize(List<Map<String, dynamic>> expenses, double budget) {
     double spent = 0;
     final byCategory = <String, double>{};
@@ -172,8 +155,6 @@ class ExpenseService {
     );
   }
 
-  // ------------------------------------------------------------- HELPERS
-  /// 1 [currency] = berapa IDR (memakai API kurs / cache).
   Future<double> _idrRate(String currency) async {
     if (currency == 'IDR') return 1;
     final rates = await CurrencyService.instance.getRates();

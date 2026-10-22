@@ -15,8 +15,6 @@ IconData _categoryIcon(String category) {
       return Icons.directions_bus_outlined;
     case 'Makanan & Minuman':
       return Icons.restaurant_outlined;
-    case 'Oleh-oleh':
-      return Icons.card_giftcard_outlined;
     case 'Belanja':
       return Icons.shopping_bag_outlined;
     case 'Donasi & Sedekah':
@@ -28,7 +26,6 @@ IconData _categoryIcon(String category) {
   }
 }
 
-/// Pencatatan pengeluaran + ringkasan anggaran.
 class ExpensePage extends StatefulWidget {
   const ExpensePage({super.key});
 
@@ -43,7 +40,7 @@ class _ExpensePageState extends State<ExpensePage> {
   double _budget = 0;
   bool _isLoading = true;
   String? _error;
-  String? _categoryFilter; // null = semua
+  String? _categoryFilter;
 
   @override
   void initState() {
@@ -82,7 +79,6 @@ class _ExpensePageState extends State<ExpensePage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  // -------------------------------------------------------------- BUDGET
   Future<void> _editBudget() async {
     final controller = TextEditingController(
       text: _budget > 0 ? _budget.toStringAsFixed(0) : '',
@@ -125,7 +121,6 @@ class _ExpensePageState extends State<ExpensePage> {
     setState(() => _budget = value < 0 ? 0 : value);
   }
 
-  // ---------------------------------------------------------------- CRUD
   Future<void> _openForm({Map<String, dynamic>? existing}) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -172,7 +167,6 @@ class _ExpensePageState extends State<ExpensePage> {
     }
   }
 
-  // --------------------------------------------------------------- BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -262,7 +256,6 @@ class _ExpensePageState extends State<ExpensePage> {
     );
   }
 
-  // ------------------------------------------------------ RINGKASAN
   Widget _summaryCard(BudgetSummary s) {
     final over = s.isOverBudget;
 
@@ -484,7 +477,6 @@ class _ExpensePageState extends State<ExpensePage> {
     );
   }
 
-  // --------------------------------------------------------- DAFTAR
   Widget _expenseTile(Map<String, dynamic> e) {
     final currency = e['currency']?.toString() ?? 'IDR';
     final amount = (e['amount'] as num).toDouble();
@@ -551,9 +543,6 @@ class _ExpensePageState extends State<ExpensePage> {
   }
 }
 
-// =====================================================================
-//  FORM TAMBAH / UBAH PENGELUARAN
-// =====================================================================
 class _ExpenseFormSheet extends StatefulWidget {
   final ExpenseService service;
   final Map<String, dynamic>? existing;
