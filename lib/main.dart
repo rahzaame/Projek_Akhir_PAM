@@ -5,8 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/biometric_service.dart';
 import 'services/biometric_preferences.dart';
 import 'supabase_config.dart';
+import 'pages/reset_password_page.dart';
 import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
+
+// Navigator global untuk membuka halaman reset password
+// dari event autentikasi Supabase.
+final GlobalKey<NavigatorState> appNavigatorKey =
+    GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,6 +20,30 @@ Future<void> main() async {
   await Supabase.initialize(
     url: SupabaseConfig.projectUrl,
     publishableKey: SupabaseConfig.publishableKey,
+  );
+
+  // Dengarkan event pemulihan password dari Supabase.
+  Supabase.instance.client.auth.onAuthStateChange.listen(
+    (authState) {
+      if (authState.event == AuthChangeEvent.passwordRecovery) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final navigator = appNavigatorKey.currentState;
+
+          if (navigator == null) {
+            debugPrint(
+              'Navigator belum siap untuk halaman reset password.',
+            );
+            return;
+          }
+
+          navigator.push(
+            MaterialPageRoute(
+              builder: (_) => const ResetPasswordPage(),
+            ),
+          );
+        });
+      }
+    },
   );
 
   runApp(const SafarMateApp());
@@ -25,6 +55,7 @@ class SafarMateApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'SafarMate',
       theme: ThemeData(
@@ -57,7 +88,8 @@ class _AuthGateState extends State<AuthGate>
   bool _needsAuthentication = false;
 
   final BiometricService _biometric = BiometricService();
-  final BiometricPreferences _preferences = BiometricPreferences();
+  final BiometricPreferences _preferences =
+      BiometricPreferences();
 
   @override
   void initState() {
@@ -74,7 +106,9 @@ class _AuthGateState extends State<AuthGate>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void didChangeAppLifecycleState(
+    AppLifecycleState state,
+  ) {
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
@@ -116,7 +150,7 @@ class _AuthGateState extends State<AuthGate>
       // Periksa apakah fitur biometrik diaktifkan.
       final enabled = await _preferences.isEnabled();
 
-      // Jika nonaktif, cukup gunakan sesi login Supabase.
+      // Jika nonaktif, gunakan sesi login Supabase.
       if (!enabled) {
         if (!mounted) return;
 
@@ -139,7 +173,9 @@ class _AuthGateState extends State<AuthGate>
         _needsAuthentication = !authenticated;
       });
     } catch (e) {
-      debugPrint('Gagal memeriksa akses biometrik: $e');
+      debugPrint(
+        'Gagal memeriksa akses biometrik: $e',
+      );
 
       if (!mounted) return;
 
@@ -153,7 +189,8 @@ class _AuthGateState extends State<AuthGate>
 
   @override
   Widget build(BuildContext context) {
-    final session = Supabase.instance.client.auth.currentSession;
+    final session =
+        Supabase.instance.client.auth.currentSession;
 
     // Tidak ada sesi login: tampilkan halaman login.
     if (session == null) {
@@ -174,7 +211,8 @@ class _AuthGateState extends State<AuthGate>
       return const DashboardPage();
     }
 
-    // Verifikasi gagal atau dibatalkan: dashboard tetap terkunci.
+    // Verifikasi gagal atau dibatalkan:
+    // dashboard tetap terkunci.
     return Scaffold(
       body: Center(
         child: Padding(
@@ -193,7 +231,8 @@ class _AuthGateState extends State<AuthGate>
               ),
               const SizedBox(height: 16),
               FilledButton(
-                onPressed: _checking ? null : _checkAccess,
+                onPressed:
+                    _checking ? null : _checkAccess,
                 child: const Text('Coba Lagi'),
               ),
             ],

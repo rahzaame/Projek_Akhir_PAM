@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/supabase_service.dart';
+import 'forgot_password_page.dart';
 import 'dashboard_page.dart';
 import 'register_page.dart';
 
@@ -197,11 +198,10 @@ class _LoginPageState extends State<LoginPage> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Fitur lupa password akan ditambahkan.',
-                            ),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ForgotPasswordPage(),
                           ),
                         );
                       },
@@ -244,7 +244,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 22),
 
-
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -276,28 +275,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Container(
-                  //   padding: const EdgeInsets.all(16),
-                  //   decoration: BoxDecoration(
-                  //     color: _lightGreen,
-                  //     borderRadius: BorderRadius.circular(13),
-                  //   ),
-                  //   child: const Row(
-                  //     mainAxisAlignment: MainAxisAlignment.center,
-                  //     children: [
-                  //       Icon(Icons.explore_outlined, color: _green),
-                  //       SizedBox(width: 10),
-                  //       Flexible(
-                  //         child: Text(
-                  //           'Temani perjalanan ibadahmu bersama SafarMate.',
-                  //           textAlign: TextAlign.center,
-                  //           style: TextStyle(color: _green),
-                  //         ),
-                  //       ),
-                  //     ],
-                  //   ),
-                  // ),
                 ],
               ),
             ),
