@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../services/currency_service.dart';
-import '../services/expense_service.dart';
+import '../services/mata_uang_service.dart';
+import '../services/catat_pengeluaran_service.dart';
 import '../utils/format_utils.dart';
 
 const Color _green = Color(0xFF176B50);
@@ -15,8 +15,6 @@ IconData _categoryIcon(String category) {
       return Icons.directions_bus_outlined;
     case 'Makanan & Minuman':
       return Icons.restaurant_outlined;
-    case 'Oleh-oleh':
-      return Icons.card_giftcard_outlined;
     case 'Belanja':
       return Icons.shopping_bag_outlined;
     case 'Donasi & Sedekah':
@@ -28,7 +26,6 @@ IconData _categoryIcon(String category) {
   }
 }
 
-/// Pencatatan pengeluaran + ringkasan anggaran.
 class ExpensePage extends StatefulWidget {
   const ExpensePage({super.key});
 
@@ -41,6 +38,8 @@ class _ExpensePageState extends State<ExpensePage> {
 
   List<Map<String, dynamic>> _expenses = [];
   double _budget = 0;
+  String _budgetCurrency = 'IDR';
+  CurrencyRates? _rates;
   bool _isLoading = true;
   String? _error;
   String? _categoryFilter; // null = semua
@@ -57,14 +56,18 @@ class _ExpensePageState extends State<ExpensePage> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<dynamic>([
         _service.fetchExpenses(),
         _service.getBudget(),
+        _service.getBudgetCurrency(),
+        CurrencyService.instance.getRates(),
       ]);
       if (!mounted) return;
       setState(() {
         _expenses = results[0] as List<Map<String, dynamic>>;
         _budget = results[1] as double;
+        _budgetCurrency = results[2] as String;
+        _rates = results[3] as CurrencyRates;
         _isLoading = false;
       });
     } catch (e) {
@@ -82,10 +85,11 @@ class _ExpensePageState extends State<ExpensePage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  // -------------------------------------------------------------- BUDGET
   Future<void> _editBudget() async {
     final controller = TextEditingController(
-      text: _budget > 0 ? _budget.toStringAsFixed(0) : '',
+      text: _budget > 0
+          ? _budget.toStringAsFixed(2).replaceFirst(RegExp(r'\.00$'), '')
+          : '',
     );
 
     final value = await showDialog<double>(
@@ -96,10 +100,10 @@ class _ExpensePageState extends State<ExpensePage> {
           controller: controller,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Total anggaran (Rupiah)',
-            prefixText: 'Rp ',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: 'Total anggaran ($_budgetCurrency)',
+            prefixText: '$_budgetCurrency ',
+            border: const OutlineInputBorder(),
             helperText: 'Kosongkan untuk menghapus anggaran',
           ),
         ),
@@ -120,18 +124,21 @@ class _ExpensePageState extends State<ExpensePage> {
     controller.dispose();
 
     if (value == null || !mounted) return;
-    await _service.setBudget(value);
+    await _service.setBudget(value, _budgetCurrency);
     if (!mounted) return;
     setState(() => _budget = value < 0 ? 0 : value);
   }
 
-  // ---------------------------------------------------------------- CRUD
   Future<void> _openForm({Map<String, dynamic>? existing}) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _ExpenseFormSheet(service: _service, existing: existing),
+      builder: (_) => _ExpenseFormSheet(
+        service: _service,
+        existing: existing,
+        defaultCurrency: _budgetCurrency,
+      ),
     );
     if (saved != true || !mounted) return;
     _snack(
@@ -172,7 +179,6 @@ class _ExpensePageState extends State<ExpensePage> {
     }
   }
 
-  // --------------------------------------------------------------- BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -218,7 +224,30 @@ class _ExpensePageState extends State<ExpensePage> {
       );
     }
 
-    final summary = _service.summarize(_expenses, _budget);
+    final rates = _rates;
+    if (rates == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Kurs mata uang belum tersedia. Periksa koneksi internet.',
+              ),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: _load, child: const Text('Coba Lagi')),
+            ],
+          ),
+        ),
+      );
+    }
+    final summary = _service.summarize(
+      _expenses,
+      _budget,
+      _budgetCurrency,
+      rates,
+    );
     final filtered = _categoryFilter == null
         ? _expenses
         : _expenses.where((e) => e['category'] == _categoryFilter).toList();
@@ -262,7 +291,6 @@ class _ExpensePageState extends State<ExpensePage> {
     );
   }
 
-  // ------------------------------------------------------ RINGKASAN
   Widget _summaryCard(BudgetSummary s) {
     final over = s.isOverBudget;
 
@@ -290,6 +318,41 @@ class _ExpensePageState extends State<ExpensePage> {
                 ),
               ),
               const Spacer(),
+              DropdownButton<String>(
+                value: _budgetCurrency,
+                dropdownColor: _green,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+                underline: const SizedBox.shrink(),
+                iconEnabledColor: Colors.white,
+                items: [
+                  for (final c in CurrencyService.currencies)
+                    DropdownMenuItem(value: c.code, child: Text(c.code)),
+                ],
+                onChanged: (value) async {
+                  if (value == null || value == _budgetCurrency) return;
+                  final rates = _rates;
+                  if (rates == null) return;
+                  // Konversi anggaran juga agar nilainya tidak berubah secara keliru.
+                  final oldIdrPerUnit = _budgetCurrency == 'IDR'
+                      ? 1.0
+                      : rates.idrPerUnit(_budgetCurrency);
+                  final newIdrPerUnit = value == 'IDR'
+                      ? 1.0
+                      : rates.idrPerUnit(value);
+                  final convertedBudget =
+                      _budget * oldIdrPerUnit / newIdrPerUnit;
+                  await _service.setBudget(convertedBudget, value);
+                  if (mounted) {
+                    setState(() {
+                      _budgetCurrency = value;
+                      _budget = convertedBudget;
+                    });
+                  }
+                },
+              ),
               TextButton.icon(
                 style: TextButton.styleFrom(foregroundColor: Colors.white),
                 onPressed: _editBudget,
@@ -304,13 +367,21 @@ class _ExpensePageState extends State<ExpensePage> {
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
           Text(
-            formatMoney(s.spentIdr, 'IDR'),
+            formatMoney(s.spent, s.currency),
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 28,
             ),
           ),
+          if (s.currency != 'IDR')
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '≈ ${formatMoney(s.spentIdr, 'IDR')}',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
           const SizedBox(height: 12),
           if (s.hasBudget) ...[
             ClipRRect(
@@ -328,13 +399,13 @@ class _ExpensePageState extends State<ExpensePage> {
                 Expanded(
                   child: _summaryItem(
                     'Anggaran',
-                    formatMoney(s.budgetIdr, 'IDR'),
+                    '${formatMoney(s.budget, s.currency)}${s.currency == 'IDR' ? '' : '\n≈ ${formatMoney(s.budgetIdr, 'IDR')}'}',
                   ),
                 ),
                 Expanded(
                   child: _summaryItem(
                     over ? 'Melebihi anggaran' : 'Sisa anggaran',
-                    formatMoney(s.remainingIdr.abs(), 'IDR'),
+                    '${formatMoney(s.remaining.abs(), s.currency)}${s.currency == 'IDR' ? '' : '\n≈ ${formatMoney(s.remainingIdr.abs(), 'IDR')}'}',
                   ),
                 ),
               ],
@@ -352,30 +423,6 @@ class _ExpensePageState extends State<ExpensePage> {
               'Atur anggaran perjalanan untuk melihat sisa anggaranmu.',
               style: TextStyle(color: Colors.white70, fontSize: 12),
             ),
-          if (s.byCurrency.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final entry in s.byCurrency.entries)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      formatMoney(entry.value, entry.key),
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -430,7 +477,7 @@ class _ExpensePageState extends State<ExpensePage> {
                         const SizedBox(width: 8),
                         Expanded(child: Text(e.key)),
                         Text(
-                          formatMoney(e.value, 'IDR'),
+                          formatMoney(e.value, s.currency),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -439,7 +486,7 @@ class _ExpensePageState extends State<ExpensePage> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: LinearProgressIndicator(
-                        value: s.spentIdr == 0 ? 0 : e.value / s.spentIdr,
+                        value: s.spent == 0 ? 0 : e.value / s.spent,
                         minHeight: 6,
                         backgroundColor: _lightGreen,
                         color: _green,
@@ -484,7 +531,6 @@ class _ExpensePageState extends State<ExpensePage> {
     );
   }
 
-  // --------------------------------------------------------- DAFTAR
   Widget _expenseTile(Map<String, dynamic> e) {
     final currency = e['currency']?.toString() ?? 'IDR';
     final amount = (e['amount'] as num).toDouble();
@@ -551,14 +597,16 @@ class _ExpensePageState extends State<ExpensePage> {
   }
 }
 
-// =====================================================================
-//  FORM TAMBAH / UBAH PENGELUARAN
-// =====================================================================
 class _ExpenseFormSheet extends StatefulWidget {
   final ExpenseService service;
   final Map<String, dynamic>? existing;
+  final String defaultCurrency;
 
-  const _ExpenseFormSheet({required this.service, this.existing});
+  const _ExpenseFormSheet({
+    required this.service,
+    required this.defaultCurrency,
+    this.existing,
+  });
 
   @override
   State<_ExpenseFormSheet> createState() => _ExpenseFormSheetState();
@@ -586,7 +634,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
 
     if (e == null) {
       _amount = TextEditingController();
-      _currency = 'SAR';
+      _currency = widget.defaultCurrency;
       _category = expenseCategories.first;
       final now = DateTime.now();
       _date = DateTime(now.year, now.month, now.day);

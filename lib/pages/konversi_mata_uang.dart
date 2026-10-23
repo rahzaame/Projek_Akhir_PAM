@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../services/currency_service.dart';
+import '../services/mata_uang_service.dart';
 import '../utils/format_utils.dart';
 
-/// Konversi mata uang IDR, SAR, dan TRY memakai API kurs.
 class CurrencyConverterPage extends StatefulWidget {
   const CurrencyConverterPage({super.key});
 
@@ -133,7 +132,6 @@ class _CurrencyConverterPageState extends State<CurrencyConverterPage> {
               ),
             ),
 
-          // ---------------------------------------------- KALKULATOR
           Card(
             elevation: 0,
             color: Colors.white,
@@ -226,7 +224,6 @@ class _CurrencyConverterPageState extends State<CurrencyConverterPage> {
             ),
           ),
 
-          // ------------------------------------------------ KURS
           if (rates != null) ...[
             const SizedBox(height: 16),
             const Padding(

@@ -20,6 +20,12 @@ import 'tanya_safarmate_ai_page.dart';
 import 'peta_lokasi_page.dart';
 import 'kompas_kiblat_page.dart';
 import 'sensor_perangkat_page.dart';
+import 'my_schedule.dart';
+import 'konversi_mata_uang.dart';
+import 'zona_waktu.dart';
+import 'catat_pengeluaran.dart';
+import 'quiz_Page.dart';
+import 'notification_setting.dart';
 
 const Color safarGreen = Color(0xFF176B50);
 const Color safarBackground = Color(0xFFF7F8F5);
@@ -378,6 +384,11 @@ class _DashboardPageState extends State<DashboardPage> {
       ..showSnackBar(SnackBar(content: Text('$feature sedang disiapkan.')));
   }
 
+  Future<void> _openFeaturePage(Widget page) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => page));
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -484,6 +495,19 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
+
+                    _homeShortcut(
+                      Icons.calendar_month_rounded,
+                      'Jadwal',
+                      'Kelola agenda perjalanan',
+                      () => _openFeaturePage(const MySchedulePage()),
+                    ),
+                    _homeShortcut(
+                      Icons.quiz_outlined,
+                      'Kuis Manasik',
+                      'Uji pengetahuan perjalanan',
+                      () => _openFeaturePage(const QuizPage()),
+                    ),
                   ],
                 ),
               ),
@@ -714,22 +738,28 @@ class _DashboardPageState extends State<DashboardPage> {
       padding: const EdgeInsets.all(20),
       children: [
         _featureTile(
+          Icons.calendar_month_rounded,
+          'Jadwal Perjalanan',
+          'Lihat dan kelola agenda perjalanan',
+          () => _openFeaturePage(const MySchedulePage()),
+        ),
+        _featureTile(
           Icons.currency_exchange_rounded,
           'Konversi Mata Uang',
-          'IDR, SAR, dan USD',
-          () => _showComingSoon('Konversi Mata Uang'),
+          'IDR, SAR, dan TRY',
+          () => _openFeaturePage(const CurrencyConverterPage()),
         ),
         _featureTile(
           Icons.access_time_rounded,
-          'Konversi Waktu',
-          'WIB, WITA, WIT, dan London',
-          () => _showComingSoon('Konversi Waktu'),
+          'Konversi Zona Waktu',
+          'WIB, WITA, WIT, London, dan Arab Saudi',
+          () => _openFeaturePage(const TimeConverterPage()),
         ),
         _featureTile(
           Icons.receipt_long_outlined,
           'Catatan Pengeluaran',
-          'Catat kebutuhan selama perjalanan',
-          () => _showComingSoon('Catatan Pengeluaran'),
+          'Catat pengeluaran dan lihat ringkasan anggaran',
+          () => _openFeaturePage(const ExpensePage()),
         ),
         if (!_isAdmin)
           _featureTile(
@@ -745,6 +775,18 @@ class _DashboardPageState extends State<DashboardPage> {
               );
             },
           ),
+        _featureTile(
+          Icons.quiz_outlined,
+          'Kuis Manasik',
+          'Uji pengetahuan manasik dan destinasi',
+          () => _openFeaturePage(const QuizPage()),
+        ),
+        _featureTile(
+          Icons.notifications_none_rounded,
+          'Pengaturan Notifikasi',
+          'Atur pengingat jadwal dan perjalanan',
+          () => _openFeaturePage(const NotificationSettingsPage()),
+        ),
       ],
     );
   }

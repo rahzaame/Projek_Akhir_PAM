@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../services/notification_service.dart';
 import '../services/schedule_service.dart';
-import '../services/timezone_service.dart';
+import '../services/zona_waktu_service.dart';
 import '../utils/format_utils.dart';
 import 'notification_setting.dart';
-import 'time_converter.dart';
+import 'zona_waktu.dart';
 
 const Color _green = Color(0xFF176B50);
 const Color _lightGreen = Color(0xFFE1F2E8);
@@ -581,7 +581,7 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
   late DateTime _date;
   TimeOfDay? _time;
   late String _timezone;
-  late int _reminder; // -1 = tanpa pengingat
+  late int _reminder;
 
   @override
   void initState() {
@@ -653,7 +653,7 @@ class _ScheduleFormSheetState extends State<_ScheduleFormSheet> {
         timezone: _timezone,
         location: _location.text.trim(),
         description: _description.text.trim(),
-        // Pengingat hanya bermakna bila jadwal punya jam.
+
         reminderMinutes: (_time == null || _reminder < 0) ? null : _reminder,
       ),
     );

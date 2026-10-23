@@ -18,7 +18,6 @@ enum QuizCategory {
   const QuizCategory(this.id, this.label, this.description);
 }
 
-/// Satu soal pilihan ganda (urutan opsi sudah diacak).
 class QuizQuestion {
   final String question;
   final List<String> options;
@@ -35,7 +34,6 @@ class QuizQuestion {
   });
 }
 
-/// Soal mentah: opsi pertama selalu jawaban benar, diacak saat soal dibuat.
 class _RawQuestion {
   final QuizCategory category;
   final String question;
@@ -83,13 +81,11 @@ class QuizHistoryEntry {
   }
 }
 
-/// Bank soal + penyimpanan hasil ke tabel `quiz_results`.
 class QuizService {
   final SupabaseClient _client = Supabase.instance.client;
 
   static const int questionsPerRound = 5;
 
-  /// Membuat satu ronde soal acak (soal & urutan opsi diacak).
   static List<QuizQuestion> generateRound(
     QuizCategory category, {
     int count = questionsPerRound,
@@ -118,7 +114,6 @@ class QuizService {
     }).toList();
   }
 
-  // ---------------------------------------------------------- DATABASE
   Future<void> saveResult({
     required QuizCategory category,
     required int correctCount,
@@ -158,9 +153,7 @@ class QuizService {
         .toList();
   }
 
-  // ------------------------------------------------------------ BANK SOAL
   static const List<_RawQuestion> _bank = [
-    // ------------------------------ MANASIK
     _RawQuestion(
       QuizCategory.manasik,
       'Berapa kali putaran tawaf mengelilingi Ka’bah?',

@@ -2,7 +2,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/format_utils.dart';
 
-/// CRUD tabel `schedules` + integrasi itinerary paket ke jadwal pengguna.
 class ScheduleService {
   final SupabaseClient _client = Supabase.instance.client;
 
@@ -12,7 +11,6 @@ class ScheduleService {
     return user.id;
   }
 
-  // ---------------------------------------------------------------- READ
   Future<List<Map<String, dynamic>>> fetchSchedules() async {
     final response = await _client
         .from('schedules')
@@ -24,8 +22,6 @@ class ScheduleService {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // -------------------------------------------------------------- CREATE
-  /// Mengembalikan baris yang baru dibuat (berisi `id`).
   Future<Map<String, dynamic>> addSchedule({
     required String title,
     required DateTime date,
@@ -59,7 +55,6 @@ class ScheduleService {
     return Map<String, dynamic>.from(row);
   }
 
-  // -------------------------------------------------------------- UPDATE
   Future<Map<String, dynamic>> updateSchedule({
     required String id,
     required String title,
@@ -92,7 +87,6 @@ class ScheduleService {
     return Map<String, dynamic>.from(row);
   }
 
-  // -------------------------------------------------------------- DELETE
   Future<void> deleteSchedule(String id) async {
     await _client
         .from('schedules')
@@ -101,8 +95,6 @@ class ScheduleService {
         .eq('user_id', _userId);
   }
 
-  // ------------------------------------------------- INTEGRASI ITINERARY
-  /// Daftar pemesanan (tabel `trips`) milik pengguna yang masih aktif.
   Future<List<Map<String, dynamic>>> fetchTrips() async {
     final response = await _client
         .from('trips')
@@ -117,12 +109,6 @@ class ScheduleService {
         .toList();
   }
 
-  /// Menyalin itinerary paket milik [trip] ke tabel `schedules`.
-  ///
-  /// Tanggal tiap kegiatan = tanggal keberangkatan + (day_number - 1).
-  /// [timezone] adalah zona waktu yang dipakai untuk jam `start_time` itinerary.
-  /// Item yang sudah pernah diimpor dilewati (tidak dobel).
-  /// Mengembalikan daftar baris baru yang berhasil ditambahkan.
   Future<List<Map<String, dynamic>>> importItinerary({
     required Map<String, dynamic> trip,
     required String timezone,
