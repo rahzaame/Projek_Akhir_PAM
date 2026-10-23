@@ -45,6 +45,10 @@ dependencies:
   crypto: ^3.0.7
   file_picker: ^13.1.0
   url_launcher: ^6.3.3
+  flutter_map: ^8.3.2
+  latlong2: ^0.9.1
+  geolocator: ^14.1.2
+  flutter_markdown: ^0.7.7+1
 
 dev_dependencies:
   flutter_test:

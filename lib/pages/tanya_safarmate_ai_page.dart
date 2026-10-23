@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 const Color safarGreen = Color(0xFF176B50);
 const Color safarLightGreen = Color(0xFFE1F2E8);
@@ -12,33 +14,233 @@ class TanyaSafarMateAiPage extends StatefulWidget {
 
 class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  final _supabase = Supabase.instance.client;
+
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
-      text: 'Assalamu’alaikum! Aku SafarMate AI. Antarmuka percakapan ini sudah disiapkan, tetapi layanan AI belum terhubung. Untuk sementara, silakan gunakan menu Tata Cara Umrah dan Doa dan Dzikir.',
+      text:
+          'Assalamu’alaikum! Aku SafarMate AI. '
+          'Silakan tanyakan seputar persiapan perjalanan, '
+          'panduan Umrah, atau informasi yang kamu butuhkan.',
       isUser: false,
     ),
   ];
 
+  bool _isLoading = false;
+  bool _isLoadingHistory = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  // Memuat riwayat berdasarkan akun yang sedang login.
+  Future<void> _loadHistory() async {
+    try {
+      final user = _supabase.auth.currentUser;
+
+      if (user == null) return;
+
+      final rows = await _supabase
+          .from('safarmate_ai_messages')
+          .select('id, role, content, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: true)
+          .order('id', ascending: true);
+
+      if (!mounted) return;
+
+      final history = rows.map<_ChatMessage>((row) {
+        return _ChatMessage(
+          text: row['content'] as String,
+          isUser: row['role'] == 'user',
+        );
+      }).toList();
+
+      // Jika ada riwayat, tampilkan percakapan dari database.
+      // Jika kosong, pesan pembuka tetap ditampilkan.
+      if (history.isNotEmpty) {
+        setState(() {
+          _messages
+            ..clear()
+            ..addAll(history);
+        });
+
+        _scrollToBottom();
+      }
+    } catch (error) {
+      debugPrint('Gagal memuat riwayat chat: $error');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Riwayat chat gagal dimuat. Periksa koneksi dan coba lagi.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingHistory = false);
+      }
+    }
+  }
+
+  // Menyimpan pesan ke database sesuai akun yang login.
+  Future<void> _saveMessage({
+    required String userId,
+    required String role,
+    required String content,
+  }) async {
+    await _supabase.from('safarmate_ai_messages').insert({
+      'user_id': userId,
+      'role': role,
+      'content': content,
+    });
+  }
+
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+
+    if (text.isEmpty || _isLoading || _isLoadingHistory) return;
+
+    final user = _supabase.auth.currentUser;
+
+    // Pastikan pesan memiliki akun pemilik.
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sesi login tidak ditemukan. Silakan login kembali.'),
+        ),
+      );
+      return;
+    }
+
+    final userId = user.id;
 
     setState(() {
       _messages.add(_ChatMessage(text: text, isUser: true));
-      _messages.add(
-        const _ChatMessage(
-          text: 'Pesanmu sudah masuk ke tampilan demo. Jawaban otomatis belum tersedia karena layanan AI belum diintegrasikan. Untuk pertanyaan hukum atau keabsahan ibadah, tanyakan kepada pembimbing ibadah yang kompeten.',
-          isUser: false,
-        ),
-      );
       _controller.clear();
+      _isLoading = true;
     });
+
+    _scrollToBottom();
+
+    // Simpan pertanyaan terlebih dahulu.
+    try {
+      await _saveMessage(userId: userId, role: 'user', content: text);
+    } catch (error) {
+      debugPrint('Gagal menyimpan pertanyaan: $error');
+
+      if (mounted) {
+        setState(() {
+          _messages.add(
+            const _ChatMessage(
+              text:
+                  'Pertanyaan belum berhasil disimpan. '
+                  'Periksa koneksi dan izin database, lalu coba lagi.',
+              isUser: false,
+            ),
+          );
+          _isLoading = false;
+        });
+
+        _scrollToBottom();
+      }
+
+      return;
+    }
+
+    try {
+      // Memanggil Edge Function SafarMate AI.
+      final response = await _supabase.functions.invoke(
+        'safarmate-ai',
+        body: {'message': text},
+      );
+
+      final data = response.data;
+      final answer = data is Map ? data['answer']?.toString() : null;
+
+      if (response.status < 200 ||
+          response.status >= 300 ||
+          answer == null ||
+          answer.trim().isEmpty) {
+        throw Exception('Respons AI tidak tersedia.');
+      }
+
+      final answerText = answer.trim();
+
+      // Jawaban tetap ditampilkan meskipun penyimpanan jawaban gagal.
+      try {
+        await _saveMessage(
+          userId: userId,
+          role: 'assistant',
+          content: answerText,
+        );
+      } catch (error) {
+        debugPrint('Gagal menyimpan jawaban AI: $error');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Jawaban tampil, tetapi gagal disimpan ke riwayat.',
+              ),
+            ),
+          );
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(_ChatMessage(text: answerText, isUser: false));
+      });
+    } catch (error) {
+      debugPrint('Gagal mendapatkan jawaban AI: $error');
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(
+          const _ChatMessage(
+            text:
+                'Maaf, SafarMate AI belum dapat menjawab saat ini. '
+                'Pastikan koneksi internet tersedia dan layanan AI '
+                'berfungsi, lalu coba lagi.',
+            isUser: false,
+          ),
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _scrollToBottom();
+      }
+    }
   }
 
   @override
@@ -52,21 +254,38 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
       ),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            color: const Color(0xFFFFF5DF),
-            child: const Text(
-              'Mode demo — belum terhubung ke layanan AI. Jangan masukkan data pribadi atau informasi sensitif.',
-              style: TextStyle(fontSize: 12, height: 1.4),
-            ),
-          ),
+          if (_isLoadingHistory)
+            const LinearProgressIndicator(color: safarGreen, minHeight: 2),
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (_isLoading ? 1 : 0),
               itemBuilder: (context, index) {
+                if (_isLoading && index == _messages.length) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: safarGreen,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
                 final message = _messages[index];
+
                 return Align(
                   alignment: message.isUser
                       ? Alignment.centerRight
@@ -79,13 +298,56 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
                       color: message.isUser ? safarGreen : Colors.white,
                       borderRadius: BorderRadius.circular(15),
                     ),
-                    child: Text(
-                      message.text,
-                      style: TextStyle(
-                        color: message.isUser ? Colors.white : Colors.black87,
-                        height: 1.45,
-                      ),
-                    ),
+                    child: message.isUser
+                        ? Text(
+                            message.text,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              height: 1.45,
+                            ),
+                          )
+                        : MarkdownBody(
+                            data: message.text,
+                            selectable: true,
+                            styleSheet: MarkdownStyleSheet(
+                              p: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 14,
+                                height: 1.45,
+                              ),
+                              h1: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              h2: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              h3: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              h4: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              strong: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                              em: const TextStyle(
+                                fontStyle: FontStyle.italic,
+                                color: Colors.black87,
+                              ),
+                              listBullet: const TextStyle(
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
                   ),
                 );
               },
@@ -121,7 +383,9 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: _sendMessage,
+                    onPressed: _isLoading || _isLoadingHistory
+                        ? null
+                        : _sendMessage,
                     style: IconButton.styleFrom(
                       backgroundColor: safarGreen,
                       foregroundColor: Colors.white,
