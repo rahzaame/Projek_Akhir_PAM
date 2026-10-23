@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/format_utils.dart';
-import 'currency_service.dart';
+import 'mata_uang_service.dart';
 
 const List<String> expenseCategories = [
   'Akomodasi',

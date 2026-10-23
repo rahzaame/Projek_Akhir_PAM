@@ -16,9 +16,9 @@ import 'doa_dan_dzikir_page.dart';
 import 'tips_perjalanan_page.dart';
 import 'tanya_safarmate_ai_page.dart';
 import 'my_schedule.dart';
-import 'currency_coverter.dart';
-import 'time_converter.dart';
-import 'expense.dart';
+import 'konversi_mata_uang.dart';
+import 'zona_waktu.dart';
+import 'catat_pengeluaran.dart';
 import 'quiz_Page.dart';
 import 'notification_setting.dart';
 

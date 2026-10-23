@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Mata uang yang didukung.
 class AppCurrency {
   final String code;
   final String name;

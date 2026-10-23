@@ -5,7 +5,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../utils/format_utils.dart';
 import 'schedule_service.dart';
-import 'timezone_service.dart';
+import 'zona_waktu_service.dart';
 
 class NotificationPrefs {
   final bool scheduleEnabled;

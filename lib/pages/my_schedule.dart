@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../services/notification_service.dart';
 import '../services/schedule_service.dart';
-import '../services/timezone_service.dart';
+import '../services/zona_waktu_service.dart';
 import '../utils/format_utils.dart';
 import 'notification_setting.dart';
-import 'time_converter.dart';
+import 'zona_waktu.dart';
 
 const Color _green = Color(0xFF176B50);
 const Color _lightGreen = Color(0xFFE1F2E8);
