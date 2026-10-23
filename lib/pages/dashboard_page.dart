@@ -460,6 +460,7 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // SALAM DAN PROFIL PENGGUNA
           Row(
             children: [
               CircleAvatar(
@@ -494,20 +495,6 @@ class _DashboardPageState extends State<DashboardPage> {
                         color: safarGreen,
                       ),
                     ),
-                    const SizedBox(height: 12),
-
-                    _homeShortcut(
-                      Icons.calendar_month_rounded,
-                      'Jadwal',
-                      'Kelola agenda perjalanan',
-                      () => _openFeaturePage(const MySchedulePage()),
-                    ),
-                    _homeShortcut(
-                      Icons.quiz_outlined,
-                      'Kuis Manasik',
-                      'Uji pengetahuan perjalanan',
-                      () => _openFeaturePage(const QuizPage()),
-                    ),
                   ],
                 ),
               ),
@@ -520,44 +507,16 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF176B50), Color(0xFF399477)],
-              ),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.mosque_rounded, color: Colors.white, size: 38),
-                SizedBox(height: 14),
-                Text(
-                  'Perjalanan Ibadahmu',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Persiapkan perjalanan Umrah dengan lebih '
-                  'mudah bersama SafarMate.',
-                  style: TextStyle(color: Colors.white, height: 1.5),
-                ),
-              ],
-            ),
-          ),
+
           const SizedBox(height: 26),
+
+          // MENU UTAMA
           const Text(
             'Menu Utama',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 14),
+
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
@@ -566,24 +525,47 @@ class _DashboardPageState extends State<DashboardPage> {
             crossAxisSpacing: 12,
             childAspectRatio: 1.15,
             children: [
+              // GRID 1
+              _homeShortcut(
+                Icons.calendar_month_rounded,
+                'Agenda Saya',
+                'Atur jadwal dan pengingat pribadi',
+                () => _openFeaturePage(const MySchedulePage()),
+              ),
+
+              // GRID 2
+              _homeShortcut(
+                Icons.quiz_outlined,
+                'Kuis Manasik',
+                'Uji pengetahuan perjalanan',
+                () => _openFeaturePage(const QuizPage()),
+              ),
+
+              // GRID 3
               _homeShortcut(
                 Icons.checklist_rounded,
                 'Checklist',
                 'Persiapan Umrah',
                 _openChecklist,
               ),
+
+              // GRID 4
               _homeShortcut(
-                Icons.calendar_month_rounded,
+                Icons.route_rounded,
                 'Jadwal',
-                'Pilih paket perjalanan',
+                'Lihat jadwal perjalanan Umrah',
                 _openItineraryPackages,
               ),
+
+              // GRID 5
               _homeShortcut(
                 Icons.currency_exchange_rounded,
                 'Keuangan',
                 'Konversi mata uang',
                 () => setState(() => _selectedIndex = 3),
               ),
+
+              // GRID 6
               _homeShortcut(
                 Icons.auto_awesome_rounded,
                 'SafarMate AI',
@@ -597,12 +579,16 @@ class _DashboardPageState extends State<DashboardPage> {
                   );
                 },
               ),
+
+              // GRID 7
               _homeShortcut(
                 Icons.flight_takeoff_rounded,
                 'Paket Umrah',
                 'Umrah Reguler & Plus Turki',
                 _openPackages,
               ),
+
+              // GRID 8
               _homeShortcut(
                 Icons.history_rounded,
                 'Riwayat Pemesanan',
@@ -611,6 +597,48 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ],
           ),
+
+          const SizedBox(height: 26),
+
+          // BANNER PERJALANAN IBADAHMU DI BAGIAN BAWAH
+          // Container(
+          //   width: double.infinity,
+          //   padding: const EdgeInsets.all(20),
+          //   decoration: BoxDecoration(
+          //     borderRadius: BorderRadius.circular(20),
+          //     gradient: const LinearGradient(
+          //       colors: [Color(0xFF176B50), Color(0xFF399477)],
+          //     ),
+          //   ),
+          //   child: const Column(
+          //     crossAxisAlignment: CrossAxisAlignment.start,
+          //     children: [
+          //       Icon(
+          //         Icons.mosque_rounded,
+          //         color: Colors.white,
+          //         size: 38,
+          //       ),
+          //       SizedBox(height: 14),
+          //       Text(
+          //         'Perjalanan Ibadahmu',
+          //         style: TextStyle(
+          //           color: Colors.white,
+          //           fontWeight: FontWeight.bold,
+          //           fontSize: 22,
+          //         ),
+          //       ),
+          //       SizedBox(height: 8),
+          //       Text(
+          //         'Persiapkan perjalanan Umrah dengan lebih '
+          //         'mudah bersama SafarMate.',
+          //         style: TextStyle(
+          //           color: Colors.white,
+          //           height: 1.5,
+          //         ),
+          //       ),
+          //     ],
+          //   ),
+          // ),
           const SizedBox(height: 20),
         ],
       ),
@@ -739,8 +767,8 @@ class _DashboardPageState extends State<DashboardPage> {
       children: [
         _featureTile(
           Icons.calendar_month_rounded,
-          'Jadwal Perjalanan',
-          'Lihat dan kelola agenda perjalanan',
+          'Agenda Saya',
+          'Atur jadwal dan pengingat pribadi',
           () => _openFeaturePage(const MySchedulePage()),
         ),
         _featureTile(
