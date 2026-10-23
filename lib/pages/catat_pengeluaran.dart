@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/mata_uang_service.dart';
-import '../services/expense_service.dart';
+import '../services/catat_pengeluaran_service.dart';
 import '../utils/format_utils.dart';
 
 const Color _green = Color(0xFF176B50);
