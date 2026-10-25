@@ -315,7 +315,6 @@ class _DashboardPageState extends State<DashboardPage> {
     _openFeaturePage(const BookingHistoryPage());
   }
 
-  // Menu Jadwal: tampilkan daftar paket terlebih dahulu.
   Future<void> _openItineraryPackages() async {
     try {
       final packages = await PackageService().getPackages();
@@ -923,7 +922,6 @@ class _DashboardPageState extends State<DashboardPage> {
           'Pengingat agenda, keberangkatan, dan checklist',
           () => _openFeaturePage(const NotificationSettingsPage()),
         ),
-        // Hanya muncul untuk akun jamaah (bukan admin).
         if (!_isAdmin)
           _featureTile(
             Icons.verified_user_outlined,
@@ -939,7 +937,6 @@ class _DashboardPageState extends State<DashboardPage> {
             },
           ),
 
-        // Menu khusus akun admin.
         if (_isAdmin) ...[
           _featureTile(
             Icons.fact_check_outlined,
