@@ -10,6 +10,7 @@ import 'supabase_config.dart';
 import 'pages/reset_password_page.dart';
 import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
+import 'services/notification_service.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey =
     GlobalKey<NavigatorState>();
@@ -36,6 +37,8 @@ Future<void> main() async {
       debugPrint('Auth state error: $error');
     },
   );
+
+  await NotificationService.instance.init();
 
   runApp(const SafarMateApp());
 }
