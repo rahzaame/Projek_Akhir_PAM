@@ -37,6 +37,21 @@ class _QuizPageState extends State<QuizPage> {
   String? _saveError;
   late Future<List<QuizHistoryEntry>> _historyFuture;
 
+  // ---- Mode permainan: lawan waktu, nyawa, combo, dan skip lewat shake ----
+  static const int _secondsPerQuestion = 15;
+  static const int _maxLives = 3;
+  static const int _maxSkips = 2;
+  static const int _basePoints = 100;
+  static const int _timedOut = -1; // penanda jawaban kosong karena waktu habis
+
+  Timer? _timer;
+  bool _paused = false; // true saat dialog keluar tampil
+  int _timeLeft = _secondsPerQuestion;
+  int _lives = _maxLives;
+  int _combo = 0;
+  int _skipsLeft = _maxSkips;
+  int _points = 0;
+
   StreamSubscription<AccelerometerEvent>? _accelSub;
   DateTime _lastShake = DateTime.fromMillisecondsSinceEpoch(0);
   bool _sensorAvailable = true;
@@ -54,6 +69,7 @@ class _QuizPageState extends State<QuizPage> {
   @override
   void dispose() {
     _accelSub?.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -86,28 +102,60 @@ class _QuizPageState extends State<QuizPage> {
     }
   }
 
-  bool get _shakeAllowed {
-    switch (_phase) {
-      case _Phase.menu:
-      case _Phase.result:
-        return true;
-      case _Phase.playing:
-        return _index == 0 && _selected == null;
-    }
-  }
-
+  // Goyang HP: saat bermain = lewati soal, di menu/hasil = mulai ronde baru.
   void _onShake() {
-    if (!_shakeAllowed) return;
+    if (_phase == _Phase.playing) {
+      _skip();
+      return;
+    }
     HapticFeedback.mediumImpact();
     _startQuiz(_category);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text('Soal diacak! 🎲'),
+          content: Text('Ronde baru dimulai! 🎲'),
           duration: Duration(seconds: 1),
         ),
       );
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted || _phase != _Phase.playing || _selected != null) {
+        t.cancel();
+        return;
+      }
+      if (_timeLeft <= 1) {
+        t.cancel();
+        _onTimeUp();
+        return;
+      }
+      setState(() => _timeLeft--);
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  // Waktu habis dihitung sebagai jawaban salah.
+  void _onTimeUp() {
+    if (_selected != null) return;
+    HapticFeedback.heavyImpact();
+    setState(() {
+      _timeLeft = 0;
+      _selected = _timedOut;
+      _loseLife();
+    });
+  }
+
+  // Dipanggil di dalam setState.
+  void _loseLife() {
+    _lives--;
+    _combo = 0;
   }
 
   void _startQuiz(QuizCategory category) {
@@ -119,27 +167,82 @@ class _QuizPageState extends State<QuizPage> {
       _selected = null;
       _startedAt = DateTime.now();
       _saveError = null;
+      _lives = _maxLives;
+      _combo = 0;
+      _points = 0;
+      _skipsLeft = _maxSkips;
+      _timeLeft = _secondsPerQuestion;
       _phase = _Phase.playing;
     });
+    _startTimer();
   }
 
   void _answer(int option) {
     if (_selected != null) return;
+    _stopTimer();
     setState(() {
       _selected = option;
-      if (option == _questions[_index].correctIndex) _correct++;
+      if (option == _questions[_index].correctIndex) {
+        _correct++;
+        _combo++;
+        _points += _basePoints * _combo;
+      } else {
+        _loseLife();
+      }
     });
   }
 
-  Future<void> _next() async {
-    if (_index < _questions.length - 1) {
-      setState(() {
-        _index++;
-        _selected = null;
-      });
+  // Lewati soal (jatah terbatas). Combo hilang, nyawa tidak berkurang.
+  Future<void> _skip() async {
+    if (_phase != _Phase.playing ||
+        _paused ||
+        _selected != null ||
+        _skipsLeft <= 0) {
       return;
     }
+    HapticFeedback.mediumImpact();
+    _stopTimer();
+    setState(() {
+      _skipsLeft--;
+      _combo = 0;
+    });
 
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Soal dilewati ⏭️ Sisa skip: $_skipsLeft'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+
+    if (_index >= _questions.length - 1) {
+      await _finish();
+      return;
+    }
+    setState(() {
+      _index++;
+      _timeLeft = _secondsPerQuestion;
+    });
+    _startTimer();
+  }
+
+  Future<void> _next() async {
+    final isLast = _index >= _questions.length - 1;
+    if (_lives <= 0 || isLast) {
+      await _finish();
+      return;
+    }
+    setState(() {
+      _index++;
+      _selected = null;
+      _timeLeft = _secondsPerQuestion;
+    });
+    _startTimer();
+  }
+
+  Future<void> _finish() async {
+    _stopTimer();
     _durationSeconds = DateTime.now().difference(_startedAt!).inSeconds;
     setState(() => _phase = _Phase.result);
     await _saveResult();
@@ -173,6 +276,8 @@ class _QuizPageState extends State<QuizPage> {
 
   Future<bool> _confirmExit() async {
     if (_phase != _Phase.playing) return true;
+    _paused = true;
+    _stopTimer();
     final leave = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -191,7 +296,15 @@ class _QuizPageState extends State<QuizPage> {
         ],
       ),
     );
-    return leave ?? false;
+    _paused = false;
+    final shouldLeave = leave ?? false;
+    if (!shouldLeave &&
+        mounted &&
+        _phase == _Phase.playing &&
+        _selected == null) {
+      _startTimer(); // lanjutkan hitung mundur
+    }
+    return shouldLeave;
   }
 
   @override
@@ -241,7 +354,8 @@ class _QuizPageState extends State<QuizPage> {
               ),
               SizedBox(height: 6),
               Text(
-                '5 soal acak tiap ronde. Pilih kategori untuk mulai.',
+                '5 soal, 15 detik per soal, 3 nyawa. Jawab benar beruntun '
+                'untuk combo & poin berlipat!',
                 style: TextStyle(color: Colors.white),
               ),
             ],
@@ -291,10 +405,11 @@ class _QuizPageState extends State<QuizPage> {
             Expanded(
               child: Text(
                 _sensorAvailable
-                    ? 'Goyangkan HP untuk mengacak soal dan langsung memulai '
+                    ? 'Saat bermain, goyangkan HP untuk melewati soal '
+                          '(maks. 2x). Di menu & hasil, goyang untuk mulai '
                           'ronde baru.'
                     : 'Sensor goyang tidak tersedia di perangkat ini. '
-                          'Gunakan tombol Acak.',
+                          'Gunakan tombol Lewati soal.',
                 style: const TextStyle(height: 1.4, fontSize: 13),
               ),
             ),
@@ -400,6 +515,10 @@ class _QuizPageState extends State<QuizPage> {
     final answered = _selected != null;
     final isLast = _index == _questions.length - 1;
 
+    final urgent = !answered && _timeLeft <= 5;
+    final timerColor = urgent ? Colors.red.shade600 : _green;
+    final outOfLives = _lives <= 0;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -413,23 +532,56 @@ class _QuizPageState extends State<QuizPage> {
               ),
             ),
             const Spacer(),
-            Chip(
-              avatar: const Icon(Icons.check_circle, size: 16, color: _green),
-              label: Text('$_correct benar'),
-              visualDensity: VisualDensity.compact,
-              backgroundColor: _lightGreen,
+            _livesRow(),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            _hudChip(
+              Icons.stars_rounded,
+              '$_points poin',
+              Colors.amber.shade800,
+              const Color(0xFFFFF4D8),
+            ),
+            _hudChip(
+              Icons.local_fire_department_rounded,
+              'Combo x$_combo',
+              Colors.deepOrange,
+              const Color(0xFFFFEDE3),
+            ),
+            _hudChip(
+              Icons.skip_next_rounded,
+              'Skip $_skipsLeft',
+              _green,
+              _lightGreen,
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: (_index + (answered ? 1 : 0)) / _questions.length,
-            minHeight: 8,
-            backgroundColor: _lightGreen,
-            color: _green,
-          ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Icon(Icons.timer_outlined, size: 20, color: timerColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: _timeLeft / _secondsPerQuestion,
+                  minHeight: 8,
+                  backgroundColor: _lightGreen,
+                  color: timerColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$_timeLeft dtk',
+              style: TextStyle(fontWeight: FontWeight.bold, color: timerColor),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Card(
@@ -479,9 +631,24 @@ class _QuizPageState extends State<QuizPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _selected == q.correctIndex ? 'Benar! 🎉' : 'Kurang tepat',
+                    _selected == _timedOut
+                        ? 'Waktu habis! ⏰'
+                        : _selected == q.correctIndex
+                        ? 'Benar! 🎉 +${_basePoints * _combo} poin'
+                        : 'Kurang tepat',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
+                  if (outOfLives)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Nyawa habis, permainan selesai.',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 4),
                   Text(q.explanation, style: const TextStyle(height: 1.4)),
                 ],
@@ -495,23 +662,52 @@ class _QuizPageState extends State<QuizPage> {
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             onPressed: _next,
-            child: Text(isLast ? 'Lihat Hasil' : 'Soal Berikutnya'),
+            child: Text(
+              (isLast || outOfLives) ? 'Lihat Hasil' : 'Soal Berikutnya',
+            ),
           ),
-        ] else if (_index == 0) ...[
+        ] else ...[
           const SizedBox(height: 8),
           Center(
             child: TextButton.icon(
-              onPressed: _onShake,
-              icon: const Icon(Icons.shuffle_rounded),
+              onPressed: _skipsLeft > 0 ? _skip : null,
+              icon: const Icon(Icons.skip_next_rounded),
               label: Text(
                 _sensorAvailable
-                    ? 'Acak soal (atau goyangkan HP)'
-                    : 'Acak soal',
+                    ? 'Lewati soal ($_skipsLeft) atau goyangkan HP'
+                    : 'Lewati soal ($_skipsLeft)',
               ),
             ),
           ),
         ],
       ],
+    );
+  }
+
+  Widget _livesRow() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int i = 0; i < _maxLives; i++)
+          Padding(
+            padding: const EdgeInsets.only(left: 2),
+            child: Icon(
+              i < _lives ? Icons.favorite : Icons.favorite_border,
+              color: Colors.red.shade400,
+              size: 24,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _hudChip(IconData icon, String label, Color color, Color background) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      visualDensity: VisualDensity.compact,
+      backgroundColor: background,
+      side: BorderSide.none,
     );
   }
 
@@ -579,14 +775,15 @@ class _QuizPageState extends State<QuizPage> {
 
   Widget _buildResult() {
     final total = _questions.length;
-    final score = total == 0 ? 0 : ((_correct / total) * 100).round();
+    final accuracy = total == 0 ? 0 : ((_correct / total) * 100).round();
+    final gameOver = _lives <= 0;
 
     final String message;
     final IconData icon;
-    if (score >= 80) {
+    if (accuracy >= 80) {
       message = 'Masya Allah, pengetahuanmu sudah sangat baik!';
       icon = Icons.emoji_events_rounded;
-    } else if (score >= 60) {
+    } else if (accuracy >= 60) {
       message = 'Bagus! Sedikit lagi belajar, kamu pasti lebih siap.';
       icon = Icons.thumb_up_alt_rounded;
     } else {
@@ -601,7 +798,7 @@ class _QuizPageState extends State<QuizPage> {
         Icon(icon, size: 72, color: Colors.amber.shade700),
         const SizedBox(height: 12),
         Text(
-          '$score',
+          '$_points',
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 64,
@@ -609,13 +806,20 @@ class _QuizPageState extends State<QuizPage> {
             color: _green,
           ),
         ),
+        const Text(
+          'POIN',
+          textAlign: TextAlign.center,
+          style: TextStyle(letterSpacing: 2, color: Colors.black54),
+        ),
+        const SizedBox(height: 6),
         Text(
-          '$_correct dari $total soal benar • $_durationSeconds detik',
+          '$_correct dari $total soal benar • akurasi $accuracy% • '
+          '$_durationSeconds detik',
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 12),
         Text(
-          message,
+          gameOver ? 'Nyawa habis! $message' : message,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 16, height: 1.4),
         ),

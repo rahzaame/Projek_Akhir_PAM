@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/biometric_credentials.dart';
+import '../services/biometric_preferences.dart';
+import '../services/biometric_service.dart';
 import '../services/supabase_service.dart';
+import 'auth_gate.dart';
 import 'forgot_password_page.dart';
-import 'dashboard_page.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -19,11 +23,28 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   final _supabaseService = SupabaseService();
 
+  final _biometric = BiometricService();
+  final _biometricPrefs = BiometricPreferences();
+  final _credentials = BiometricCredentials();
+
   bool _isLoading = false;
   bool _hidePassword = true;
+  bool _rememberMe = true;
+  bool _biometricBusy = false;
+  BiometricStatus _biometricStatus = BiometricStatus.notSupported;
 
   static const Color _green = Color(0xFF176B50);
-  static const Color _lightGreen = Color(0xFFE1F2E8);
+  static const Color _softGreen = Color(0xFFEAF4EF);
+
+  static const String _rememberKey = 'login_remember_me';
+  static const String _emailKey = 'login_remembered_email';
+  static const String _promptedKey = 'biometric_prompted';
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
 
   @override
   void dispose() {
@@ -32,44 +53,213 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  Future<void> _init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remember = prefs.getBool(_rememberKey) ?? true;
+    final email = prefs.getString(_emailKey) ?? '';
+    final status = await _biometric.status();
+
+    if (!mounted) return;
+
+    setState(() {
+      _rememberMe = remember;
+      if (remember && email.isNotEmpty && _emailController.text.isEmpty) {
+        _emailController.text = email;
+      }
+      _biometricStatus = status;
+    });
+  }
+
+  void _snack(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: error ? Colors.red : null,
+        ),
+      );
+  }
+
+  Future<void> _saveRememberedEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_rememberKey, _rememberMe);
+    if (_rememberMe) {
+      await prefs.setString(_emailKey, email);
+    } else {
+      await prefs.remove(_emailKey);
+    }
+  }
+
+  void _goToApp() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate(startUnlocked: true)),
+      (route) => false,
+    );
+  }
+
+  Future<void> _syncBiometric(String email, String password) async {
+    try {
+      if (_biometricStatus != BiometricStatus.available) return;
+
+      if (await _biometricPrefs.isEnabled()) {
+        await _credentials.save(email: email, password: password);
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_promptedKey) ?? false) return;
+      if (!mounted) return;
+
+      final agree = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Aktifkan login biometrik?'),
+          content: const Text(
+            'Lain kali kamu bisa masuk cukup dengan sidik jari atau wajah, '
+            'tanpa mengetik password.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Nanti saja'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _green),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Aktifkan'),
+            ),
+          ],
+        ),
+      );
+
+      await prefs.setBool(_promptedKey, true);
+      if (agree != true) return;
+
+      final ok = await _biometric.authenticate(
+        reason: 'Verifikasi untuk mengaktifkan login biometrik',
+      );
+
+      if (!mounted) return;
+
+      if (!ok) {
+        _snack('Verifikasi biometrik gagal. Bisa diaktifkan lagi dari Profil.');
+        return;
+      }
+
+      await _credentials.save(email: email, password: password);
+      await _biometricPrefs.setEnabled(true);
+
+      if (!mounted) return;
+      _snack('Login biometrik diaktifkan.');
+    } catch (e) {
+      debugPrint('Gagal menyiapkan biometrik: $e');
+    }
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
     try {
-      await _supabaseService.signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      await _supabaseService.signIn(email: email, password: password);
+
+      await _saveRememberedEmail(email);
+      await _syncBiometric(email, password);
 
       if (!mounted) return;
-
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const DashboardPage()),
-        (route) => false,
-      );
+      _goToApp();
     } on AuthException catch (error) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Login gagal: ${error.message}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _snack('Login gagal: ${error.message}', error: true);
     } catch (error) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Terjadi kesalahan. Periksa koneksi dan konfigurasi.'),
-          backgroundColor: Colors.red,
-        ),
+      _snack(
+        'Terjadi kesalahan. Periksa koneksi dan konfigurasi.',
+        error: true,
       );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loginWithBiometric() async {
+    if (_biometricBusy || _isLoading) return;
+
+    if (_biometricStatus != BiometricStatus.available) {
+      _snack(_biometric.messageFor(_biometricStatus));
+      return;
+    }
+
+    setState(() => _biometricBusy = true);
+
+    try {
+      final enabled = await _biometricPrefs.isEnabled();
+      final saved = await _credentials.read();
+
+      if (!enabled || saved == null) {
+        if (!mounted) return;
+        _snack(
+          'Login biometrik belum aktif. Masuk dengan password sekali, '
+          'lalu aktifkan biometrik.',
+        );
+        return;
+      }
+
+      final ok = await _biometric.authenticate(
+        reason: 'Verifikasi untuk masuk ke SafarMate',
+      );
+
+      if (!mounted) return;
+
+      if (!ok) {
+        _snack('Verifikasi biometrik dibatalkan atau gagal.');
+        return;
+      }
+
+      setState(() => _isLoading = true);
+
+      await _supabaseService.signIn(
+        email: saved.email,
+        password: saved.password,
+      );
+
+      if (!mounted) return;
+      _goToApp();
+    } on AuthApiException catch (error) {
+      // Password berubah / akun tidak valid: hapus kredensial lama.
+      if (error.message.toLowerCase().contains('invalid')) {
+        await _credentials.clear();
+        if (!mounted) return;
+        _snack(
+          'Data login tersimpan sudah tidak valid. Masuk dengan password.',
+          error: true,
+        );
+      } else {
+        if (!mounted) return;
+        _snack('Login gagal: ${error.message}', error: true);
+      }
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      _snack('Login gagal: ${error.message}', error: true);
+    } catch (error) {
+      if (!mounted) return;
+      _snack(
+        'Terjadi kesalahan. Periksa koneksi dan konfigurasi.',
+        error: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _biometricBusy = false;
+          _isLoading = false;
+        });
       }
     }
   }
@@ -79,8 +269,73 @@ class _LoginPageState extends State<LoginPage> {
         .push(MaterialPageRoute(builder: (_) => const RegisterPage()));
   }
 
+  InputDecoration _decoration({
+    required String hint,
+    required IconData icon,
+    Widget? suffix,
+  }) {
+    OutlineInputBorder border(Color color) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: color),
+    );
+
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+      prefixIcon: Icon(icon, color: Colors.grey.shade600, size: 22),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+      border: border(Colors.grey.shade300),
+      enabledBorder: border(Colors.grey.shade300),
+      focusedBorder: border(_green),
+    );
+  }
+
+  Widget _buildBiometricButton() {
+    return Material(
+      color: _softGreen,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: (_isLoading || _biometricBusy) ? null : _loginWithBiometric,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_biometricBusy)
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _green,
+                  ),
+                )
+              else
+                const Icon(Icons.fingerprint, color: _green, size: 26),
+              const SizedBox(width: 10),
+              const Text(
+                'Masuk dengan biometrik',
+                style: TextStyle(
+                  color: _green,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showBiometric = _biometricStatus != BiometricStatus.notSupported;
+
     return Scaffold(
       backgroundColor: const Color(0xFFFCFCF9),
       body: SafeArea(
@@ -93,8 +348,17 @@ class _LoginPageState extends State<LoginPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 12),
-                  const Icon(Icons.mosque_rounded, size: 76, color: _green),
-                  const SizedBox(height: 8),
+                  Image.asset(
+                    'lib/assets/logo_safarmate.png',
+                    height: 120,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.mosque_rounded,
+                      size: 84,
+                      color: _green,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   const Text(
                     'SafarMate',
                     textAlign: TextAlign.center,
@@ -104,124 +368,129 @@ class _LoginPageState extends State<LoginPage> {
                       color: _green,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Teman Perjalanan Ibadahmu',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 15, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 22),
                   const Text(
                     'Masuk ke akun Anda',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 15, color: Colors.black87),
                   ),
-                  const SizedBox(height: 24),
-
+                  const SizedBox(height: 22),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      hintText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(13),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
+                    autofillHints: const [AutofillHints.email],
+                    decoration: _decoration(
+                      hint: 'Email',
+                      icon: Icons.mail_outline_rounded,
                     ),
                     validator: (value) {
                       final email = value?.trim() ?? '';
-
-                      if (email.isEmpty) {
-                        return 'Email wajib diisi';
-                      }
-
+                      if (email.isEmpty) return 'Email wajib diisi';
                       if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
                           .hasMatch(email)) {
                         return 'Masukkan email yang valid';
                       }
-
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
-
+                  const SizedBox(height: 14),
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _hidePassword,
                     textInputAction: TextInputAction.done,
+                    autofillHints: const [AutofillHints.password],
                     onFieldSubmitted: (_) {
                       if (!_isLoading) _login();
                     },
-                    decoration: InputDecoration(
-                      hintText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _hidePassword = !_hidePassword;
-                          });
-                        },
+                    decoration: _decoration(
+                      hint: 'Password',
+                      icon: Icons.lock_outline_rounded,
+                      suffix: IconButton(
+                        onPressed: () =>
+                            setState(() => _hidePassword = !_hidePassword),
                         icon: Icon(
                           _hidePassword
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
+                          color: Colors.grey.shade600,
+                          size: 20,
                         ),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(13),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Password wajib diisi';
                       }
-
                       return null;
                     },
                   ),
-                  const SizedBox(height: 14),
-
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ForgotPasswordPage(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Lupa password?',
-                        style: TextStyle(color: _green),
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 8),
-
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: _isLoading
+                            ? null
+                            : () => setState(() => _rememberMe = !_rememberMe),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  activeColor: _green,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  onChanged: _isLoading
+                                      ? null
+                                      : (v) => setState(
+                                          () => _rememberMe = v ?? false,
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Ingat saya',
+                                style: TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ForgotPasswordPage(),
+                                  ),
+                                );
+                              },
+                        child: const Text(
+                          'Lupa password?',
+                          style: TextStyle(color: _green, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   SizedBox(
                     height: 52,
                     child: FilledButton(
-                      onPressed: _isLoading ? null : _login,
+                      onPressed: (_isLoading || _biometricBusy) ? null : _login,
                       style: FilledButton.styleFrom(
                         backgroundColor: _green,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: _isLoading
@@ -242,8 +511,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                     ),
                   ),
-                  const SizedBox(height: 22),
-
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey.shade300)),
@@ -251,22 +519,23 @@ class _LoginPageState extends State<LoginPage> {
                         padding: EdgeInsets.symmetric(horizontal: 14),
                         child: Text(
                           'atau',
-                          style: TextStyle(color: Colors.black54),
+                          style: TextStyle(color: Colors.black54, fontSize: 12),
                         ),
                       ),
                       Expanded(child: Divider(color: Colors.grey.shade300)),
                     ],
                   ),
-                  const SizedBox(height: 20),
-
+                  const SizedBox(height: 18),
                   OutlinedButton(
-                    onPressed: _isLoading ? null : _openRegister,
+                    onPressed: (_isLoading || _biometricBusy)
+                        ? null
+                        : _openRegister,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _green,
                       side: const BorderSide(color: _green),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: const Text(
@@ -274,6 +543,10 @@ class _LoginPageState extends State<LoginPage> {
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
+                  if (showBiometric) ...[
+                    const SizedBox(height: 16),
+                    _buildBiometricButton(),
+                  ],
                   const SizedBox(height: 16),
                 ],
               ),
