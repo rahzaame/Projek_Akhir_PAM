@@ -12,6 +12,7 @@ import 'checklist_page.dart';
 import 'itinerary_page.dart';
 import 'admin_itinerary_page.dart';
 import 'admin_packages_page.dart';
+import 'saran_kesan_page.dart';
 import '../services/package_service.dart';
 import 'tata_cara_umrah_page.dart';
 import 'doa_dan_dzikir_page.dart';
@@ -812,7 +813,12 @@ class _DashboardPageState extends State<DashboardPage> {
           Icons.feedback_outlined,
           'Saran dan Kesan',
           'Mata kuliah Pemrograman Aplikasi Mobile',
-          () => _showComingSoon('Saran dan Kesan'),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SaranKesanPage()),
+            );
+          },
         ),
         _featureTile(
           Icons.notifications_none_rounded,
