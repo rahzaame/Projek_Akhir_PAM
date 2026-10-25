@@ -1,13 +1,13 @@
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../services/supabase_service.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
 
   @override
-  State<ResetPasswordPage> createState() =>
-      _ResetPasswordPageState();
+  State<ResetPasswordPage> createState() => _ResetPasswordPageState();
 }
 
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
@@ -27,11 +27,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     setState(() => _isLoading = true);
 
     try {
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(
-          password: _passwordController.text,
-        ),
-      );
+      await SupabaseService().updatePassword(_passwordController.text);
 
       if (!mounted) return;
 
@@ -47,19 +43,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: _green,
-        ),
+        SnackBar(content: Text(e.message), backgroundColor: _green),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Gagal memperbarui password. Silakan coba lagi.',
-          ),
+          content: Text('Gagal memperbarui password. Silakan coba lagi.'),
           backgroundColor: _green,
         ),
       );
@@ -96,11 +87,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(
-                    Icons.lock_reset_rounded,
-                    size: 72,
-                    color: _green,
-                  ),
+                  const Icon(Icons.lock_reset_rounded, size: 72, color: _green),
                   const SizedBox(height: 20),
                   const Text(
                     'Password Baru',
@@ -122,19 +109,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     obscureText: _hidePassword,
                     decoration: InputDecoration(
                       labelText: 'Password baru',
-                      labelStyle: const TextStyle(
-                        color: _green,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.lock_outline,
-                        color: _green,
-                      ),
+                      labelStyle: const TextStyle(color: _green),
+                      prefixIcon: const Icon(Icons.lock_outline, color: _green),
                       border: const OutlineInputBorder(),
                       focusedBorder: const OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: _green,
-                          width: 2,
-                        ),
+                        borderSide: BorderSide(color: _green, width: 2),
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -157,6 +136,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       if (value.length < 8) {
                         return 'Password minimal 8 karakter';
                       }
+                      if (value.length > SupabaseService.maxPasswordLength) {
+                        return 'Password maksimal ${SupabaseService.maxPasswordLength} karakter';
+                      }
                       return null;
                     },
                   ),
@@ -166,19 +148,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     obscureText: _hideConfirmPassword,
                     decoration: InputDecoration(
                       labelText: 'Konfirmasi password',
-                      labelStyle: const TextStyle(
-                        color: _green,
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.lock_outline,
-                        color: _green,
-                      ),
+                      labelStyle: const TextStyle(color: _green),
+                      prefixIcon: const Icon(Icons.lock_outline, color: _green),
                       border: const OutlineInputBorder(),
                       focusedBorder: const OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: _green,
-                          width: 2,
-                        ),
+                        borderSide: BorderSide(color: _green, width: 2),
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -189,8 +163,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         onPressed: () {
                           setState(() {
-                            _hideConfirmPassword =
-                                !_hideConfirmPassword;
+                            _hideConfirmPassword = !_hideConfirmPassword;
                           });
                         },
                       ),
@@ -209,13 +182,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   SizedBox(
                     height: 50,
                     child: ElevatedButton(
-                      onPressed:
-                          _isLoading ? null : _savePassword,
+                      onPressed: _isLoading ? null : _savePassword,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _green,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor:
-                            _green.withValues(alpha: 0.6),
+                        disabledBackgroundColor: _green.withValues(alpha: 0.6),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
