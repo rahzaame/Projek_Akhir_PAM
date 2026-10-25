@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/mata_uang_service.dart';
 import '../services/catat_pengeluaran_service.dart';
+import '../services/trip_service.dart';
 import '../utils/format_utils.dart';
 
 const Color _green = Color(0xFF176B50);
@@ -40,6 +41,7 @@ class _ExpensePageState extends State<ExpensePage> {
   double _budget = 0;
   String _budgetCurrency = 'IDR';
   CurrencyRates? _rates;
+  List<Map<String, dynamic>> _trips = [];
   bool _isLoading = true;
   String? _error;
   String? _categoryFilter; // null = semua
@@ -61,6 +63,9 @@ class _ExpensePageState extends State<ExpensePage> {
         _service.getBudget(),
         _service.getBudgetCurrency(),
         CurrencyService.instance.getRates(),
+        TripService().fetchMyTrips().catchError(
+          (_) => <Map<String, dynamic>>[],
+        ),
       ]);
       if (!mounted) return;
       setState(() {
@@ -68,6 +73,7 @@ class _ExpensePageState extends State<ExpensePage> {
         _budget = results[1] as double;
         _budgetCurrency = results[2] as String;
         _rates = results[3] as CurrencyRates;
+        _trips = results[4] as List<Map<String, dynamic>>;
         _isLoading = false;
       });
     } catch (e) {
@@ -138,6 +144,7 @@ class _ExpensePageState extends State<ExpensePage> {
         service: _service,
         existing: existing,
         defaultCurrency: _budgetCurrency,
+        trips: _trips,
       ),
     );
     if (saved != true || !mounted) return;
@@ -531,6 +538,16 @@ class _ExpensePageState extends State<ExpensePage> {
     );
   }
 
+  String? _tripNameFor(dynamic tripId) {
+    if (tripId == null) return null;
+    for (final t in _trips) {
+      if (t['id'].toString() == tripId.toString()) {
+        return t['trip_name']?.toString();
+      }
+    }
+    return null;
+  }
+
   Widget _expenseTile(Map<String, dynamic> e) {
     final currency = e['currency']?.toString() ?? 'IDR';
     final amount = (e['amount'] as num).toDouble();
@@ -538,6 +555,7 @@ class _ExpensePageState extends State<ExpensePage> {
     final date = parseDbDate(e['expense_date']);
     final category = e['category']?.toString() ?? 'Lainnya';
     final note = e['note']?.toString() ?? '';
+    final tripName = _tripNameFor(e['trip_id']);
 
     return Dismissible(
       key: ValueKey(e['id']),
@@ -573,9 +591,10 @@ class _ExpensePageState extends State<ExpensePage> {
           ),
           subtitle: Text(
             '$category • ${date != null ? formatDateShort(date) : '-'}'
+            '${tripName != null ? '\n$tripName' : ''}'
             '${note.isNotEmpty ? '\n$note' : ''}',
           ),
-          isThreeLine: note.isNotEmpty,
+          isThreeLine: note.isNotEmpty || tripName != null,
           trailing: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -601,10 +620,12 @@ class _ExpenseFormSheet extends StatefulWidget {
   final ExpenseService service;
   final Map<String, dynamic>? existing;
   final String defaultCurrency;
+  final List<Map<String, dynamic>> trips;
 
   const _ExpenseFormSheet({
     required this.service,
     required this.defaultCurrency,
+    this.trips = const [],
     this.existing,
   });
 
@@ -621,6 +642,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
   late String _currency;
   late String _category;
   late DateTime _date;
+  String? _tripId;
   bool _isSaving = false;
   String? _error;
 
@@ -650,6 +672,15 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
           ? e['category'].toString()
           : 'Lainnya';
       _date = parseDbDate(e['expense_date']) ?? DateTime.now();
+    }
+
+    final savedTrip = e?['trip_id']?.toString();
+    if (savedTrip != null &&
+        widget.trips.any((t) => t['id'].toString() == savedTrip)) {
+      _tripId = savedTrip;
+    } else if (e == null && widget.trips.length == 1) {
+      // Hanya satu perjalanan aktif: otomatis dikaitkan.
+      _tripId = widget.trips.first['id'].toString();
     }
   }
 
@@ -691,6 +722,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
           category: _category,
           date: _date,
           note: _note.text,
+          tripId: _tripId,
         );
       } else {
         await widget.service.updateExpense(
@@ -701,6 +733,7 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
           category: _category,
           date: _date,
           note: _note.text,
+          tripId: _tripId,
         );
       }
 
@@ -821,6 +854,32 @@ class _ExpenseFormSheetState extends State<_ExpenseFormSheet> {
                   if (v != null) setState(() => _category = v);
                 },
               ),
+              if (widget.trips.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String?>(
+                  initialValue: _tripId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Perjalanan (opsional)',
+                    prefixIcon: Icon(Icons.luggage_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Tidak dikaitkan'),
+                    ),
+                    for (final t in widget.trips)
+                      DropdownMenuItem<String?>(
+                        value: t['id'].toString(),
+                        child: Text(
+                          t['trip_name']?.toString() ?? 'Perjalanan',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _tripId = v),
+                ),
+              ],
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _pickDate,

@@ -13,7 +13,6 @@ class KompasKiblatPage extends StatefulWidget {
 }
 
 class _KompasKiblatPageState extends State<KompasKiblatPage> {
-  // Koordinat Ka'bah di Makkah.
   static const double _kaabahLat = 21.4225;
   static const double _kaabahLon = 39.8262;
 
@@ -79,8 +78,6 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
   }
 
   void _calculateHeading() {
-    // Menggabungkan gravitasi dan medan magnet untuk
-    // memperkirakan arah utara magnetik.
     final normA = math.sqrt(_ax * _ax + _ay * _ay + _az * _az);
     final normM = math.sqrt(_mx * _mx + _my * _my + _mz * _mz);
 
@@ -202,7 +199,6 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
     final qibla = _qiblaBearing;
     final heading = _heading;
 
-    // Arah kiblat relatif terhadap bagian atas perangkat.
     final relativeAngle = qibla != null && heading != null
         ? (qibla - heading) * math.pi / 180
         : 0.0;

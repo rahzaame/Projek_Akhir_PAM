@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
+import '../services/schedule_service.dart';
+import '../services/trip_service.dart';
+import '../utils/format_utils.dart';
+
 const Color safarGreen = Color(0xFF176B50);
 const Color safarLightGreen = Color(0xFFE1F2E8);
 
@@ -79,8 +83,6 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
         );
       }).toList();
 
-      // Jika ada riwayat, tampilkan percakapan dari database.
-      // Jika kosong, pesan pembuka tetap ditampilkan.
       if (history.isNotEmpty) {
         setState(() {
           _messages
@@ -109,7 +111,6 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
     }
   }
 
-  // Menyimpan pesan ke database sesuai akun yang login.
   Future<void> _saveMessage({
     required String userId,
     required String role,
@@ -122,6 +123,38 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
     });
   }
 
+  Future<Map<String, dynamic>?> _buildUserContext() async {
+    try {
+      final trip = await TripService().fetchFeaturedTrip();
+      if (trip == null) return null;
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      final schedules = await ScheduleService().fetchSchedules();
+      final upcoming = schedules
+          .where((row) {
+            final date = parseDbDate(row['schedule_date']);
+            return date != null && !date.isBefore(today);
+          })
+          .take(3)
+          .map((row) => '${row['schedule_date']} ${row['title']}')
+          .toList();
+
+      return {
+        'trip_name': trip['trip_name'],
+        'status': trip['status'],
+        'departure_date': trip['departure_date'],
+        'return_date': trip['return_date'],
+        'origin_city': trip['origin_city'],
+        'participant_count': trip['participant_count'],
+        'upcoming_schedules': upcoming,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
 
@@ -129,7 +162,6 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
 
     final user = _supabase.auth.currentUser;
 
-    // Pastikan pesan memiliki akun pemilik.
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -149,7 +181,6 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
 
     _scrollToBottom();
 
-    // Simpan pertanyaan terlebih dahulu.
     try {
       await _saveMessage(userId: userId, role: 'user', content: text);
     } catch (error) {
@@ -175,10 +206,14 @@ class _TanyaSafarMateAiPageState extends State<TanyaSafarMateAiPage> {
     }
 
     try {
-      // Memanggil Edge Function SafarMate AI.
+      final userContext = await _buildUserContext();
+
       final response = await _supabase.functions.invoke(
         'safarmate-ai',
-        body: {'message': text},
+        body: {
+          'message': text,
+          if (userContext != null) 'context': userContext,
+        },
       );
 
       final data = response.data;

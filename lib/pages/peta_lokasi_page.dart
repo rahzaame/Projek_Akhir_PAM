@@ -11,7 +11,10 @@ const Color safarGreen = Color(0xFF176B50);
 const Color safarLightGreen = Color(0xFFE1F2E8);
 
 class PetaLokasiPage extends StatefulWidget {
-  const PetaLokasiPage({super.key});
+  /// Bila diisi (misalnya dari itinerary), peta langsung mencari lokasi ini.
+  final String? initialQuery;
+
+  const PetaLokasiPage({super.key, this.initialQuery});
 
   @override
   State<PetaLokasiPage> createState() => _PetaLokasiPageState();
@@ -103,6 +106,20 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
   void initState() {
     super.initState();
     _loadSavedDestinations();
+
+    final query = widget.initialQuery?.trim();
+    if (query != null && query.isNotEmpty) {
+      final lower = query.toLowerCase();
+      if (lower.contains('madinah') || lower.contains('medina')) {
+        _selectedCity = 'Madinah';
+      } else if (lower.contains('istanbul') || lower.contains('turki')) {
+        _selectedCity = 'Turki';
+      }
+      _searchController.text = query;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchPlaces();
+      });
+    }
   }
 
   @override

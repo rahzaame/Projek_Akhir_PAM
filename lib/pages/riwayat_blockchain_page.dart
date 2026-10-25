@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,12 +8,10 @@ class RiwayatBlockchainPage extends StatefulWidget {
   const RiwayatBlockchainPage({super.key});
 
   @override
-  State<RiwayatBlockchainPage> createState() =>
-      _RiwayatBlockchainPageState();
+  State<RiwayatBlockchainPage> createState() => _RiwayatBlockchainPageState();
 }
 
-class _RiwayatBlockchainPageState
-    extends State<RiwayatBlockchainPage> {
+class _RiwayatBlockchainPageState extends State<RiwayatBlockchainPage> {
   final BlockchainService _service = BlockchainService();
 
   late Future<List<Map<String, dynamic>>> _vouchersFuture;
@@ -62,32 +59,37 @@ class _RiwayatBlockchainPageState
       }
     } catch (_) {
       if (!mounted) return;
-      _showMessage(
-        'Gagal membuka PDF. Pastikan file voucher tersedia.',
-      );
+      _showMessage('Gagal membuka PDF. Pastikan file voucher tersedia.');
     }
   }
 
   void _showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatDate(dynamic value) {
-    final timestamp = DateTime.tryParse(
-      (value ?? '').toString(),
-    );
+    final timestamp = DateTime.tryParse((value ?? '').toString());
 
     if (timestamp == null) return '-';
 
     final date = timestamp.toLocal();
 
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
     ];
 
     final day = date.day.toString().padLeft(2, '0');
@@ -109,10 +111,7 @@ class _RiwayatBlockchainPageState
         elevation: 0,
         title: const Text(
           'Voucher Saya',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
         ),
         actions: [
           IconButton(
@@ -136,8 +135,7 @@ class _RiwayatBlockchainPageState
             return _buildMessage(
               icon: Icons.cloud_off_outlined,
               title: 'Voucher belum dapat dimuat',
-              subtitle:
-                  'Periksa koneksi atau konfigurasi RPC Supabase.',
+              subtitle: 'Periksa koneksi atau konfigurasi RPC Supabase.',
               action: FilledButton.icon(
                 onPressed: _refresh,
                 icon: const Icon(Icons.refresh_rounded),
@@ -147,26 +145,20 @@ class _RiwayatBlockchainPageState
           }
 
           // RPC hanya mengembalikan voucher dengan status active.
-          final vouchers = (snapshot.data ?? [])
-              .where((voucher) {
-                final code =
-                    (voucher['voucher_code'] ?? '').toString();
+          final vouchers = (snapshot.data ?? []).where((voucher) {
+            final code = (voucher['voucher_code'] ?? '').toString();
 
-                return code.isNotEmpty &&
-                    RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(code) &&
-                    (voucher['voucher_status'] ?? '')
-                            .toString()
-                            .toLowerCase() ==
-                        'active';
-              })
-              .toList();
+            return code.isNotEmpty &&
+                RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(code) &&
+                (voucher['voucher_status'] ?? '').toString().toLowerCase() ==
+                    'active';
+          }).toList();
 
           if (vouchers.isEmpty) {
             return _buildMessage(
               icon: Icons.confirmation_number_outlined,
               title: 'Belum ada voucher aktif',
-              subtitle:
-                  'Voucher yang masih berlaku akan muncul di sini.',
+              subtitle: 'Voucher yang masih berlaku akan muncul di sini.',
               action: OutlinedButton.icon(
                 onPressed: _refresh,
                 icon: const Icon(Icons.refresh_rounded),
@@ -192,10 +184,7 @@ class _RiwayatBlockchainPageState
                 const SizedBox(height: 6),
                 const Text(
                   'Lihat dan unduh dokumen voucher Anda.',
-                  style: TextStyle(
-                    color: _textMuted,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: _textMuted, fontSize: 14),
                 ),
                 const SizedBox(height: 20),
 
@@ -282,9 +271,7 @@ class _RiwayatBlockchainPageState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFE8EDE8),
-        ),
+        border: Border.all(color: const Color(0xFFE8EDE8)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.035),
@@ -385,10 +372,7 @@ class _RiwayatBlockchainPageState
                           children: [
                             const Text(
                               'Tanggal pendaftaran',
-                              style: TextStyle(
-                                color: _textMuted,
-                                fontSize: 11,
-                              ),
+                              style: TextStyle(color: _textMuted, fontSize: 11),
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -419,10 +403,7 @@ class _RiwayatBlockchainPageState
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    icon: const Icon(
-                      Icons.download_rounded,
-                      size: 20,
-                    ),
+                    icon: const Icon(Icons.download_rounded, size: 20),
                     label: const Text(
                       'Unduh Voucher PDF',
                       style: TextStyle(
@@ -437,36 +418,20 @@ class _RiwayatBlockchainPageState
           ),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 11,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: const BoxDecoration(
               color: Color(0xFFFAFCF9),
-              borderRadius: BorderRadius.vertical(
-                bottom: Radius.circular(20),
-              ),
-              border: Border(
-                top: BorderSide(
-                  color: Color(0xFFE8EDE8),
-                ),
-              ),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+              border: Border(top: BorderSide(color: Color(0xFFE8EDE8))),
             ),
             child: const Row(
               children: [
-                Icon(
-                  Icons.shield_outlined,
-                  size: 16,
-                  color: _green,
-                ),
+                Icon(Icons.shield_outlined, size: 16, color: _green),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Tercatat dalam sistem blockchain',
-                    style: TextStyle(
-                      color: _textMuted,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: _textMuted, fontSize: 11),
                   ),
                 ),
               ],
@@ -496,11 +461,7 @@ class _RiwayatBlockchainPageState
                 color: Color(0xFFE7F3EC),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                color: _green,
-                size: 35,
-              ),
+              child: Icon(icon, color: _green, size: 35),
             ),
             const SizedBox(height: 18),
             Text(

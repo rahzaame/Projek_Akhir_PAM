@@ -12,6 +12,7 @@ import 'checklist_page.dart';
 import 'itinerary_page.dart';
 import 'admin_itinerary_page.dart';
 import 'admin_packages_page.dart';
+import 'saran_kesan_page.dart';
 import '../services/package_service.dart';
 import 'tata_cara_umrah_page.dart';
 import 'doa_dan_dzikir_page.dart';
@@ -26,6 +27,8 @@ import 'zona_waktu.dart';
 import 'catat_pengeluaran.dart';
 import 'quiz_Page.dart';
 import 'notification_setting.dart';
+import 'admin_booking_page.dart';
+import '../widgets/trip_hero_card.dart';
 
 const Color safarGreen = Color(0xFF176B50);
 const Color safarBackground = Color(0xFFF7F8F5);
@@ -40,6 +43,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
+  int _homeTick = 0; // naik setiap kali beranda perlu memuat ulang ringkasan
   bool _isAdmin = false;
 
   String? _displayName;
@@ -52,7 +56,7 @@ class _DashboardPageState extends State<DashboardPage> {
     'SafarMate',
     'Panduan Ibadah',
     'Peta & Kiblat',
-    'Keuangan',
+    'Alat Perjalanan',
     'Profil',
   ];
 
@@ -207,25 +211,34 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _loadProfilePhoto() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) {
+      if (!mounted) return;
+
+      setState(() {
+        _profilePhotoUrl = null;
+        _isLoadingPhoto = false;
+      });
+      return;
+    }
+
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-
-      if (user == null) {
-        if (!mounted) return;
-        setState(() => _isLoadingPhoto = false);
-        return;
-      }
-
-      final profile = await Supabase.instance.client
+      final response = await supabase
           .from('profiles')
           .select('profile_photo')
           .eq('id', user.id)
           .maybeSingle();
 
+      final photoUrl = response?['profile_photo']?.toString().trim();
+
       if (!mounted) return;
 
       setState(() {
-        _profilePhotoUrl = profile?['profile_photo'] as String?;
+        _profilePhotoUrl = (photoUrl != null && photoUrl.isNotEmpty)
+            ? photoUrl
+            : null;
         _isLoadingPhoto = false;
       });
     } catch (e) {
@@ -281,13 +294,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _openPackages() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const PackagesPage()));
+    _openFeaturePage(const PackagesPage());
   }
 
   void _openChecklist() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const ChecklistPage()));
+    _openFeaturePage(const ChecklistPage());
   }
 
   void _openAdminPackages() {
@@ -301,8 +312,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _openBookingHistory() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const BookingHistoryPage()));
+    _openFeaturePage(const BookingHistoryPage());
   }
 
   // Menu Jadwal: tampilkan daftar paket terlebih dahulu.
@@ -378,15 +388,10 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$feature sedang disiapkan.')));
-  }
-
   Future<void> _openFeaturePage(Widget page) async {
     await Navigator.of(context)
         .push(MaterialPageRoute<void>(builder: (_) => page));
+    if (mounted) setState(() => _homeTick++);
   }
 
   @override
@@ -436,9 +441,9 @@ class _DashboardPageState extends State<DashboardPage> {
             label: 'Peta',
           ),
           NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-            label: 'Keuangan',
+            icon: Icon(Icons.handyman_outlined),
+            selectedIcon: Icon(Icons.handyman_rounded),
+            label: 'Alat',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),
@@ -455,222 +460,238 @@ class _DashboardPageState extends State<DashboardPage> {
         ? _displayName!
         : 'Sahabat SafarMate';
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() => _homeTick++);
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: safarLightGreen,
+                  backgroundImage:
+                      (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty)
+                      ? NetworkImage(_profilePhotoUrl!)
+                      : null,
+                  onBackgroundImageError: _profilePhotoUrl != null
+                      ? (exception, stackTrace) {
+                          debugPrint('Gagal memuat foto profil: $exception');
+                        }
+                      : null,
+                  child: (_profilePhotoUrl == null || _profilePhotoUrl!.isEmpty)
+                      ? const Icon(
+                          Icons.person_rounded,
+                          color: safarGreen,
+                          size: 28,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Assalamu’alaikum,',
+                        style: TextStyle(color: Colors.black54, fontSize: 13),
+                      ),
+                      Text(
+                        greetingName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Pengaturan notifikasi',
+                  onPressed: () =>
+                      _openFeaturePage(const NotificationSettingsPage()),
+                  icon: const Icon(
+                    Icons.notifications_none_rounded,
+                    color: safarGreen,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            if (_isAdmin)
+              _adminShortcuts()
+            else
+              TripHeroCard(
+                key: ValueKey('hero-$_homeTick'),
+                onOpenPackages: _openPackages,
+                onOpenBookings: _openBookingHistory,
+                onOpenChecklist: _openChecklist,
+                onOpenSchedule: () => _openFeaturePage(const MySchedulePage()),
+              ),
+
+            const SizedBox(height: 26),
+            const Text(
+              'Akses cepat',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _quickAction(
+                  Icons.event_note_rounded,
+                  'Agenda',
+                  () => _openFeaturePage(const MySchedulePage()),
+                ),
+                _quickAction(
+                  Icons.checklist_rounded,
+                  'Checklist',
+                  _openChecklist,
+                ),
+                _quickAction(
+                  Icons.receipt_long_rounded,
+                  'Pengeluaran',
+                  () => _openFeaturePage(const ExpensePage()),
+                ),
+                _quickAction(
+                  Icons.auto_awesome_rounded,
+                  'Tanya AI',
+                  () => _openFeaturePage(const TanyaSafarMateAiPage()),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 26),
+            const Text(
+              'Jelajahi',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            _featureTile(
+              Icons.flight_takeoff_rounded,
+              'Paket Umrah',
+              'Umrah Reguler dan Umrah Plus Turki',
+              _openPackages,
+            ),
+            _featureTile(
+              Icons.route_rounded,
+              'Itinerary Perjalanan',
+              'Lihat rencana harian setiap paket',
+              _openItineraryPackages,
+            ),
+            _featureTile(
+              Icons.history_rounded,
+              'Riwayat Pemesanan',
+              'Status, voucher, dan detail pemesanan',
+              _openBookingHistory,
+            ),
+            _featureTile(
+              Icons.quiz_outlined,
+              'Kuis Manasik',
+              'Uji pengetahuan manasik dan destinasi',
+              () => _openFeaturePage(const QuizPage()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _adminShortcuts() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E4A37),
+        borderRadius: BorderRadius.circular(22),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // SALAM DAN PROFIL PENGGUNA
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 25,
-                backgroundColor: safarLightGreen,
-                backgroundImage:
-                    _profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty
-                    ? NetworkImage(_profilePhotoUrl!)
-                    : null,
-                child: _profilePhotoUrl == null || _profilePhotoUrl!.isEmpty
-                    ? const Icon(
-                        Icons.person_rounded,
-                        color: safarGreen,
-                        size: 30,
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Assalamu’alaikum,',
-                      style: TextStyle(color: Colors.black54),
-                    ),
-                    Text(
-                      greetingName,
-                      style: const TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.bold,
-                        color: safarGreen,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: () => _showComingSoon('Notifikasi'),
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: safarGreen,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 26),
-
-          // MENU UTAMA
           const Text(
-            'Menu Utama',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            'Panel admin',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          const SizedBox(height: 14),
-
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.15,
-            children: [
-              // GRID 1
-              _homeShortcut(
-                Icons.calendar_month_rounded,
-                'Agenda Saya',
-                'Atur jadwal dan pengingat pribadi',
-                () => _openFeaturePage(const MySchedulePage()),
-              ),
-
-              // GRID 2
-              _homeShortcut(
-                Icons.quiz_outlined,
-                'Kuis Manasik',
-                'Uji pengetahuan perjalanan',
-                () => _openFeaturePage(const QuizPage()),
-              ),
-
-              // GRID 3
-              _homeShortcut(
-                Icons.checklist_rounded,
-                'Checklist',
-                'Persiapan Umrah',
-                _openChecklist,
-              ),
-
-              // GRID 4
-              _homeShortcut(
-                Icons.route_rounded,
-                'Jadwal',
-                'Lihat jadwal perjalanan Umrah',
-                _openItineraryPackages,
-              ),
-
-              // GRID 5
-              _homeShortcut(
-                Icons.currency_exchange_rounded,
-                'Keuangan',
-                'Konversi mata uang',
-                () => setState(() => _selectedIndex = 3),
-              ),
-
-              // GRID 6
-              _homeShortcut(
-                Icons.auto_awesome_rounded,
-                'SafarMate AI',
-                'Tanya seputar Umrah',
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const TanyaSafarMateAiPage(),
-                    ),
-                  );
-                },
-              ),
-
-              // GRID 7
-              _homeShortcut(
-                Icons.flight_takeoff_rounded,
-                'Paket Umrah',
-                'Umrah Reguler & Plus Turki',
-                _openPackages,
-              ),
-
-              // GRID 8
-              _homeShortcut(
-                Icons.history_rounded,
-                'Riwayat Pemesanan',
-                'Lihat pemesanan paketmu',
-                _openBookingHistory,
-              ),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            'Kelola pemesanan, paket, itinerary, dan voucher.',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.75)),
           ),
-
-          const SizedBox(height: 26),
-
-          // BANNER PERJALANAN IBADAHMU DI BAGIAN BAWAH
-          // Container(
-          //   width: double.infinity,
-          //   padding: const EdgeInsets.all(20),
-          //   decoration: BoxDecoration(
-          //     borderRadius: BorderRadius.circular(20),
-          //     gradient: const LinearGradient(
-          //       colors: [Color(0xFF176B50), Color(0xFF399477)],
-          //     ),
-          //   ),
-          //   child: const Column(
-          //     crossAxisAlignment: CrossAxisAlignment.start,
-          //     children: [
-          //       Icon(
-          //         Icons.mosque_rounded,
-          //         color: Colors.white,
-          //         size: 38,
-          //       ),
-          //       SizedBox(height: 14),
-          //       Text(
-          //         'Perjalanan Ibadahmu',
-          //         style: TextStyle(
-          //           color: Colors.white,
-          //           fontWeight: FontWeight.bold,
-          //           fontSize: 22,
-          //         ),
-          //       ),
-          //       SizedBox(height: 8),
-          //       Text(
-          //         'Persiapkan perjalanan Umrah dengan lebih '
-          //         'mudah bersama SafarMate.',
-          //         style: TextStyle(
-          //           color: Colors.white,
-          //           height: 1.5,
-          //         ),
-          //       ),
-          //     ],
-          //   ),
-          // ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
+          for (final item in [
+            (
+              Icons.fact_check_outlined,
+              'Kelola Pemesanan',
+              () => _openFeaturePage(const AdminBookingPage()),
+            ),
+            (
+              Icons.inventory_2_outlined,
+              'Kelola Paket Umrah',
+              () => _openFeaturePage(const AdminPackagesPage()),
+            ),
+            (
+              Icons.edit_calendar_rounded,
+              'Kelola Itinerary',
+              () => _openFeaturePage(const AdminItineraryPage()),
+            ),
+            (
+              Icons.card_giftcard,
+              'Kelola Voucher',
+              () => _openFeaturePage(const AdminVoucherPage()),
+            ),
+          ])
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(item.$1, color: const Color(0xFFE9C46A)),
+              title: Text(item.$2, style: const TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white70),
+              onTap: item.$3,
+            ),
         ],
       ),
     );
   }
 
-  Widget _homeShortcut(
-    IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
-  ) {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  Widget _quickAction(IconData icon, String label, VoidCallback onTap) {
+    return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: safarGreen, size: 32),
-              const SizedBox(height: 10),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE0E6DE)),
+                ),
+                child: Icon(icon, color: safarGreen, size: 26),
+              ),
+              const SizedBox(height: 6),
               Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11, color: Colors.black54),
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -718,6 +739,12 @@ class _DashboardPageState extends State<DashboardPage> {
             context,
             MaterialPageRoute(builder: (_) => const TanyaSafarMateAiPage()),
           ),
+        ),
+        _featureTile(
+          Icons.quiz_outlined,
+          'Kuis Manasik',
+          'Uji pengetahuan manasik dan destinasi',
+          () => _openFeaturePage(const QuizPage()),
         ),
       ],
     );
@@ -789,32 +816,6 @@ class _DashboardPageState extends State<DashboardPage> {
           'Catat pengeluaran dan lihat ringkasan anggaran',
           () => _openFeaturePage(const ExpensePage()),
         ),
-        if (!_isAdmin)
-          _featureTile(
-            Icons.verified_user_outlined,
-            'Voucher Saya',
-            'Lihat dan unduh voucher perjalanan Anda',
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const RiwayatBlockchainPage(),
-                ),
-              );
-            },
-          ),
-        _featureTile(
-          Icons.quiz_outlined,
-          'Kuis Manasik',
-          'Uji pengetahuan manasik dan destinasi',
-          () => _openFeaturePage(const QuizPage()),
-        ),
-        _featureTile(
-          Icons.notifications_none_rounded,
-          'Pengaturan Notifikasi',
-          'Atur pengingat jadwal dan perjalanan',
-          () => _openFeaturePage(const NotificationSettingsPage()),
-        ),
       ],
     );
   }
@@ -837,12 +838,17 @@ class _DashboardPageState extends State<DashboardPage> {
               radius: 28,
               backgroundColor: safarLightGreen,
               backgroundImage:
-                  _profilePhotoUrl != null &&
-                      _profilePhotoUrl!.trim().isNotEmpty
-                  ? NetworkImage(_profilePhotoUrl!)
+                  (_profilePhotoUrl != null &&
+                      _profilePhotoUrl!.trim().isNotEmpty)
+                  ? NetworkImage(_profilePhotoUrl!.trim())
+                  : null,
+              onBackgroundImageError: _profilePhotoUrl != null
+                  ? (exception, stackTrace) {
+                      debugPrint('Gagal memuat foto profil: $exception');
+                    }
                   : null,
               child:
-                  _profilePhotoUrl == null || _profilePhotoUrl!.trim().isEmpty
+                  (_profilePhotoUrl == null || _profilePhotoUrl!.trim().isEmpty)
                   ? const Icon(
                       Icons.person_rounded,
                       color: safarGreen,
@@ -904,19 +910,18 @@ class _DashboardPageState extends State<DashboardPage> {
           Icons.feedback_outlined,
           'Saran dan Kesan',
           'Mata kuliah Pemrograman Aplikasi Mobile',
-          () => _showComingSoon('Saran dan Kesan'),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SaranKesanPage()),
+            );
+          },
         ),
         _featureTile(
           Icons.notifications_none_rounded,
           'Notifikasi',
-          'Pengingat dan informasi perjalanan',
-          () => _showComingSoon('Notifikasi'),
-        ),
-        _featureTile(
-          Icons.settings_outlined,
-          'Pengaturan',
-          'Pengaturan aplikasi dan akun',
-          () => _showComingSoon('Pengaturan'),
+          'Pengingat agenda, keberangkatan, dan checklist',
+          () => _openFeaturePage(const NotificationSettingsPage()),
         ),
         // Hanya muncul untuk akun jamaah (bukan admin).
         if (!_isAdmin)
@@ -936,6 +941,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
         // Menu khusus akun admin.
         if (_isAdmin) ...[
+          _featureTile(
+            Icons.fact_check_outlined,
+            'Kelola Pemesanan',
+            'Lihat pemesanan jamaah dan ubah statusnya',
+            () => _openFeaturePage(const AdminBookingPage()),
+          ),
           _featureTile(
             Icons.card_giftcard,
             'Kelola Voucher Blockchain',
@@ -985,15 +996,21 @@ class _DashboardPageState extends State<DashboardPage> {
     VoidCallback onTap,
   ) {
     return Card(
-      elevation: 0,
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        leading: Icon(icon, color: safarGreen, size: 29),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: safarLightGreen,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: safarGreen, size: 24),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12.5)),
+        trailing: const Icon(Icons.chevron_right, color: Colors.black38),
         onTap: onTap,
       ),
     );

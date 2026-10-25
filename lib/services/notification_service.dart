@@ -130,6 +130,22 @@ class NotificationService {
     return options?.isEnabled ?? false;
   }
 
+  Future<bool> canExactAlarm() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    return await android?.canScheduleExactNotifications() ?? false;
+  }
+
+  Future<void> requestExactAlarm() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await android?.requestExactAlarmsPermission();
+  }
+
   Future<NotificationPrefs> loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     return NotificationPrefs(
@@ -183,6 +199,11 @@ class NotificationService {
   Future<int> pendingCount() async {
     if (!_ready) return 0;
     return (await _plugin.pendingNotificationRequests()).length;
+  }
+
+  Future<List<String>> pendingNotificationsDebug() async {
+    final list = await _plugin.pendingNotificationRequests();
+    return list.map((e) => '${e.id} | ${e.title} | ${e.payload}').toList();
   }
 
   Future<void> showTest() async {
@@ -378,11 +399,15 @@ class NotificationService {
     required String payload,
     required NotificationDetails details,
   }) async {
+    final canExact = await canExactAlarm();
+
     await _plugin.zonedSchedule(
       id: id,
       scheduledDate: tz.TZDateTime.from(when, tz.UTC),
       notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
       title: title,
       body: body,
       payload: payload,

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,15 +8,12 @@ class AdminVoucherListPage extends StatefulWidget {
   const AdminVoucherListPage({super.key});
 
   @override
-  State<AdminVoucherListPage> createState() =>
-      _AdminVoucherListPageState();
+  State<AdminVoucherListPage> createState() => _AdminVoucherListPageState();
 }
 
-class _AdminVoucherListPageState
-    extends State<AdminVoucherListPage> {
+class _AdminVoucherListPageState extends State<AdminVoucherListPage> {
   final BlockchainService _service = BlockchainService();
-  final TextEditingController _searchController =
-      TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   late Future<List<Map<String, dynamic>>> _futureVouchers;
 
@@ -74,9 +70,8 @@ class _AdminVoucherListPageState
   void _message(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatDate(dynamic value) {
@@ -147,12 +142,9 @@ class _AdminVoucherListPageState
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _futureVouchers,
               builder: (context, snapshot) {
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: CircularProgressIndicator(
-                      color: _green,
-                    ),
+                    child: CircularProgressIndicator(color: _green),
                   );
                 }
 
@@ -160,8 +152,7 @@ class _AdminVoucherListPageState
                   return _emptyState(
                     icon: Icons.cloud_off_outlined,
                     title: 'Gagal memuat voucher',
-                    subtitle:
-                        'Periksa koneksi, lalu coba muat ulang.',
+                    subtitle: 'Periksa koneksi, lalu coba muat ulang.',
                     action: OutlinedButton.icon(
                       onPressed: _refresh,
                       icon: const Icon(Icons.refresh),
@@ -170,13 +161,10 @@ class _AdminVoucherListPageState
                   );
                 }
 
-                final query =
-                    _searchController.text.trim().toLowerCase();
+                final query = _searchController.text.trim().toLowerCase();
 
-                final vouchers =
-                    (snapshot.data ?? []).where((voucher) {
-                  final code =
-                      (voucher['voucher_code'] ?? '').toString();
+                final vouchers = (snapshot.data ?? []).where((voucher) {
+                  final code = (voucher['voucher_code'] ?? '').toString();
 
                   return code.toLowerCase().contains(query);
                 }).toList();
@@ -195,9 +183,7 @@ class _AdminVoucherListPageState
                   color: _green,
                   onRefresh: _refresh,
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                      16, 4, 16, 24,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     children: [
                       Container(
                         padding: const EdgeInsets.all(18),
@@ -216,8 +202,7 @@ class _AdminVoucherListPageState
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
                                     'Total Voucher Terdaftar',
@@ -254,11 +239,9 @@ class _AdminVoucherListPageState
   }
 
   Widget _buildVoucherCard(Map<String, dynamic> voucher) {
-    final code =
-        (voucher['voucher_code'] ?? '').toString();
+    final code = (voucher['voucher_code'] ?? '').toString();
     final value = voucher['voucher_value'];
-    final status =
-        (voucher['voucher_status'] ?? 'unknown').toString();
+    final status = (voucher['voucher_status'] ?? 'unknown').toString();
 
     return Card(
       color: Colors.white,
@@ -290,8 +273,7 @@ class _AdminVoucherListPageState
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         'KODE VOUCHER',
@@ -312,18 +294,11 @@ class _AdminVoucherListPageState
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.verified_outlined,
-                  color: _green,
-                ),
+                const Icon(Icons.verified_outlined, color: _green),
               ],
             ),
             const Divider(height: 26),
-            _infoRow(
-              Icons.payments_outlined,
-              'Nominal',
-              'SAR ${value ?? '-'}',
-            ),
+            _infoRow(Icons.payments_outlined, 'Nominal', 'SAR ${value ?? '-'}'),
             const SizedBox(height: 12),
             _infoRow(
               Icons.tag,
@@ -337,27 +312,17 @@ class _AdminVoucherListPageState
               _formatDate(voucher['created_at']),
             ),
             const SizedBox(height: 12),
-            _infoRow(
-              Icons.info_outline,
-              'Status',
-              status,
-            ),
+            _infoRow(Icons.info_outline, 'Status', status),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: code.isEmpty
-                    ? null
-                    : () => _openPdf(code),
-                icon: const Icon(
-                  Icons.picture_as_pdf_outlined,
-                ),
+                onPressed: code.isEmpty ? null : () => _openPdf(code),
+                icon: const Icon(Icons.picture_as_pdf_outlined),
                 label: const Text('Lihat / Unduh PDF'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _green,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 13,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
                   side: const BorderSide(color: _green),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -371,11 +336,7 @@ class _AdminVoucherListPageState
     );
   }
 
-  Widget _infoRow(
-    IconData icon,
-    String label,
-    String value,
-  ) {
+  Widget _infoRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -384,10 +345,7 @@ class _AdminVoucherListPageState
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
           ),
         ),
         const SizedBox(width: 12),
@@ -395,10 +353,7 @@ class _AdminVoucherListPageState
           child: Text(
             value,
             textAlign: TextAlign.end,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -422,10 +377,7 @@ class _AdminVoucherListPageState
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
@@ -433,10 +385,7 @@ class _AdminVoucherListPageState
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey.shade600),
             ),
-            if (action != null) ...[
-              const SizedBox(height: 16),
-              action,
-            ],
+            if (action != null) ...[const SizedBox(height: 16), action],
           ],
         ),
       ),

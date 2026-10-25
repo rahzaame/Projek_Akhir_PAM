@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/booking_service.dart';
+import '../services/notification_service.dart';
 
 class BookingPage extends StatefulWidget {
   final Map<String, dynamic> package;
@@ -22,6 +23,24 @@ class _BookingPageState extends State<BookingPage> {
   bool _isSubmitting = false;
 
   static const Color green = Color(0xFF176B50);
+
+  DateTime? get _packageDeparture {
+    final raw = DateTime.tryParse(
+      widget.package['departure_date']?.toString() ?? '',
+    );
+    if (raw == null) return null;
+    final date = DateTime(raw.year, raw.month, raw.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return date.isBefore(today) ? null : date;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Tanggal berangkat paket dipakai sebagai nilai awal.
+    _departureDate = _packageDeparture;
+  }
 
   num get _price =>
       num.tryParse(widget.package['price']?.toString() ?? '') ?? 0;
@@ -101,6 +120,11 @@ class _BookingPageState extends State<BookingPage> {
         originCity: _cityController.text.trim(),
         customerName: _nameController.text.trim(),
       );
+
+      // Pengingat keberangkatan langsung dijadwalkan untuk pemesanan baru.
+      try {
+        await NotificationService.instance.syncAll();
+      } catch (_) {}
 
       if (!mounted) return;
 
@@ -239,6 +263,16 @@ class _BookingPageState extends State<BookingPage> {
                   ),
                 ),
               ),
+              if (_packageDeparture != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Paket ini dijadwalkan berangkat '
+                  '${_packageDeparture!.day.toString().padLeft(2, '0')}/'
+                  '${_packageDeparture!.month.toString().padLeft(2, '0')}/'
+                  '${_packageDeparture!.year}. Kamu bisa menggantinya.',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
               const SizedBox(height: 16),
 
               const Text(

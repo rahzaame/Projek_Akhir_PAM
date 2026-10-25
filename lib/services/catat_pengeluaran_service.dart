@@ -64,6 +64,7 @@ class ExpenseService {
     required String category,
     required DateTime date,
     String? note,
+    String? tripId,
   }) async {
     final rate = await _idrRate(currency);
     await _client.from('expenses').insert({
@@ -76,6 +77,7 @@ class ExpenseService {
       'category': category,
       'expense_date': toDbDate(date),
       'note': _nullIfEmpty(note),
+      if (tripId != null) 'trip_id': tripId,
     });
   }
 
@@ -87,6 +89,7 @@ class ExpenseService {
     required String category,
     required DateTime date,
     String? note,
+    String? tripId,
   }) async {
     final oldAmount = (original['amount'] as num).toDouble();
     final oldCurrency = original['currency'].toString();
@@ -106,6 +109,8 @@ class ExpenseService {
           'category': category,
           'expense_date': toDbDate(date),
           'note': _nullIfEmpty(note),
+          if (tripId != null || original.containsKey('trip_id'))
+            'trip_id': tripId,
         })
         .eq('id', original['id'])
         .eq('user_id', _userId);

@@ -161,6 +161,8 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
+    if (_isUploadingPhoto) return;
+
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
@@ -177,15 +179,22 @@ class _ProfilePageState extends State<ProfilePage> {
         _isUploadingPhoto = true;
       });
 
-      final extension = image.name.contains('.')
+      final String originalExtension = image.name.contains('.')
           ? image.name.split('.').last.toLowerCase()
           : 'jpg';
 
-      final contentType = extension == 'jpg' || extension == 'jpeg'
-          ? 'image/jpeg'
-          : 'image/$extension';
+      final String extension =
+          ['jpg', 'jpeg', 'png', 'webp'].contains(originalExtension)
+          ? originalExtension
+          : 'jpg';
 
-      final filePath =
+      final String contentType = switch (extension) {
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        _ => 'image/jpeg',
+      };
+
+      final String filePath =
           '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$extension';
 
       await _supabase.storage
@@ -193,10 +202,10 @@ class _ProfilePageState extends State<ProfilePage> {
           .uploadBinary(
             filePath,
             bytes,
-            fileOptions: FileOptions(contentType: contentType, upsert: true),
+            fileOptions: FileOptions(contentType: contentType, upsert: false),
           );
 
-      final photoUrl = _supabase.storage
+      final String photoUrl = _supabase.storage
           .from('profile-photos')
           .getPublicUrl(filePath);
 
@@ -216,20 +225,79 @@ class _ProfilePageState extends State<ProfilePage> {
       });
 
       _showMessage('Foto profil berhasil diperbarui.');
+    } on StorageException catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _selectedImageBytes = null;
+      });
+
+      _showMessage('Upload foto gagal (${e.statusCode ?? '-'}): ${e.message}');
     } on PostgrestException catch (e) {
-      if (mounted) {
-        _showMessage('Gagal menyimpan URL foto: ${e.message}');
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _selectedImageBytes = null;
+      });
+
+      _showMessage(
+        'Foto terunggah, tetapi gagal menyimpan profil: ${e.message}',
+      );
     } catch (e) {
-      if (mounted) {
-        _showMessage('Gagal mengunggah foto: $e');
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _selectedImageBytes = null;
+      });
+
+      _showMessage('Gagal memproses foto: $e');
     } finally {
       if (mounted) {
         setState(() {
           _isUploadingPhoto = false;
         });
       }
+    }
+  }
+
+  Future<void> _deleteProfilePhoto() async {
+    final user = _supabase.auth.currentUser;
+
+    if (user == null) {
+      _showMessage('Silakan login kembali.');
+      return;
+    }
+
+    try {
+      final profile = await _supabase
+          .from('profiles')
+          .select('profile_photo')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final photoUrl = profile?['profile_photo']?.toString();
+
+      await _supabase
+          .from('profiles')
+          .update({
+            'profile_photo': null,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', user.id);
+
+      if (!mounted) return;
+
+      setState(() {
+        _profilePhoto = null;
+        _selectedImageBytes = null;
+      });
+
+      _showMessage('Foto profil berhasil dihapus.');
+
+      debugPrint('Foto lama: $photoUrl');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Gagal menghapus foto profil: $e');
     }
   }
 
@@ -369,7 +437,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 24,
+                      horizontal: 16,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
@@ -377,31 +448,53 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Column(
                       children: [
                         _buildProfilePhoto(),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: _isUploadingPhoto
-                              ? null
-                              : _uploadProfilePhoto,
-                          icon: _isUploadingPhoto
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.camera_alt_outlined),
-                          label: Text(
-                            _isUploadingPhoto
-                                ? 'Mengunggah foto...'
-                                : 'Ganti Foto Profil',
-                          ),
+                        const SizedBox(height: 16),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _isUploadingPhoto
+                                    ? null
+                                    : _uploadProfilePhoto,
+                                icon: _isUploadingPhoto
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.camera_alt_outlined),
+                                label: Text(
+                                  _isUploadingPhoto
+                                      ? 'Mengunggah...'
+                                      : 'Ganti Foto',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed:
+                                    (_isUploadingPhoto || _profilePhoto == null)
+                                    ? null
+                                    : _deleteProfilePhoto,
+                                icon: const Icon(Icons.delete_outline),
+                                label: const Text('Hapus Foto'),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
+
+                        const SizedBox(height: 16),
+
+                        // Nama pengguna
                         Text(
-                          _fullNameController.text.isEmpty
+                          _fullNameController.text.trim().isEmpty
                               ? 'Nama pengguna'
-                              : _fullNameController.text,
+                              : _fullNameController.text.trim(),
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -409,12 +502,17 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           textAlign: TextAlign.center,
                         ),
+
                         const SizedBox(height: 4),
+
+                        // Email pengguna
                         Text(
                           _email,
                           style: TextStyle(color: Colors.grey.shade600),
                           textAlign: TextAlign.center,
                         ),
+
+                        // Label admin
                         if (_isAdmin) ...[
                           const SizedBox(height: 10),
                           Container(

@@ -94,14 +94,12 @@ class PackageDetailPage extends StatelessWidget {
 
     final facilities = parseList(package['facilities']?.toString());
 
-    // Harga kamar yang belum diisi tidak ditampilkan.
     final roomPrices = <MapEntry<String, dynamic>>[
       MapEntry('Quad (4 orang/kamar)', package['price_quad']),
       MapEntry('Triple (3 orang/kamar)', package['price_triple']),
       MapEntry('Double (2 orang/kamar)', package['price_double']),
     ].where((entry) => entry.value != null).toList();
 
-    // Gunakan harga kamar Quad sebagai harga awal jika tersedia.
     final startingPrice = package['price_quad'] ?? package['price'];
 
     return Scaffold(
@@ -218,7 +216,6 @@ class PackageDetailPage extends StatelessWidget {
 
                       const SizedBox(height: 24),
 
-                      // Harga paket
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -248,7 +245,6 @@ class PackageDetailPage extends StatelessWidget {
                         ),
                       ),
 
-                      // Harga kamar
                       if (roomPrices.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         _sectionTitle('Pilihan Harga Kamar'),
@@ -259,7 +255,6 @@ class PackageDetailPage extends StatelessWidget {
                         ),
                       ],
 
-                      // Hotel
                       if (hotelMakkah.isNotEmpty ||
                           hotelMadinah.isNotEmpty) ...[
                         const SizedBox(height: 28),
@@ -286,7 +281,6 @@ class PackageDetailPage extends StatelessWidget {
                           ),
                       ],
 
-                      // Deskripsi
                       const SizedBox(height: 28),
                       _sectionTitle('Deskripsi Paket'),
                       const SizedBox(height: 10),
@@ -297,7 +291,6 @@ class PackageDetailPage extends StatelessWidget {
                         style: const TextStyle(fontSize: 14, height: 1.7),
                       ),
 
-                      // Fasilitas lama
                       if (facilities.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         _sectionTitle('Fasilitas Paket'),
@@ -311,7 +304,6 @@ class PackageDetailPage extends StatelessWidget {
                         ),
                       ],
 
-                      // Harga termasuk
                       if (included.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         _sectionTitle('Harga Termasuk'),
@@ -322,7 +314,6 @@ class PackageDetailPage extends StatelessWidget {
                         ),
                       ],
 
-                      // Harga tidak termasuk
                       if (excluded.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         _sectionTitle('Harga Tidak Termasuk'),
@@ -336,7 +327,6 @@ class PackageDetailPage extends StatelessWidget {
                         ),
                       ],
 
-                      // Keunggulan
                       if (advantages.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         _sectionTitle('Keunggulan Paket'),
@@ -356,7 +346,6 @@ class PackageDetailPage extends StatelessWidget {
             ),
           ),
 
-          // Tombol navigasi tetap di bagian bawah.
           Positioned(
             left: 0,
             right: 0,

@@ -177,6 +177,18 @@ class ScheduleService {
     return List<Map<String, dynamic>>.from(inserted);
   }
 
+  Future<List<String>> deleteSchedulesForTrip(String tripId) async {
+    final rows = await _client
+        .from('schedules')
+        .delete()
+        .eq('user_id', _userId)
+        .eq('trip_id', tripId)
+        .select('id');
+    return List<Map<String, dynamic>>.from(rows)
+        .map((r) => r['id'].toString())
+        .toList();
+  }
+
   String? _nullIfEmpty(String? value) {
     final trimmed = value?.trim();
     return (trimmed == null || trimmed.isEmpty) ? null : trimmed;

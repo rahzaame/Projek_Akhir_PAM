@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/notification_service.dart';
+import '../services/schedule_service.dart';
+import '../services/trip_service.dart';
+import 'catat_pengeluaran.dart';
+import 'my_schedule.dart';
+
 class BookingDetailPage extends StatefulWidget {
   final Map<String, dynamic> booking;
 
@@ -13,8 +19,12 @@ class BookingDetailPage extends StatefulWidget {
 class _BookingDetailPageState extends State<BookingDetailPage> {
   final SupabaseClient _client = Supabase.instance.client;
 
+  final TripService _tripService = TripService();
+
   bool _isCancelling = false;
   late String _status;
+  List<Map<String, dynamic>> _vouchers = [];
+  bool _loadingVouchers = true;
 
   static const Color safarGreen = Color(0xFF176B50);
   static const Color safarLightGreen = Color(0xFFE1F2E8);
@@ -23,6 +33,102 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
   void initState() {
     super.initState();
     _status = widget.booking['status']?.toString() ?? '';
+    _loadVouchers();
+  }
+
+  Future<void> _loadVouchers() async {
+    try {
+      final tripId = widget.booking['id']?.toString();
+      final rows = tripId == null
+          ? <Map<String, dynamic>>[]
+          : await _tripService.fetchVoucherLinks(tripId);
+      if (!mounted) return;
+      setState(() {
+        _vouchers = rows;
+        _loadingVouchers = false;
+      });
+    } catch (_) {
+      // Tabel voucher_links belum dibuat atau tidak ada akses: tampilkan kosong.
+      if (!mounted) return;
+      setState(() => _loadingVouchers = false);
+    }
+  }
+
+  Future<void> _downloadVoucher(String code) async {
+    try {
+      final opened = await _tripService.openVoucherPdf(code);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF voucher tidak dapat dibuka.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gagal membuka voucher: $e')));
+    }
+  }
+
+  /// Setelah pemesanan dibatalkan, agenda hasil impor dan pengingatnya
+  /// ikut dibersihkan supaya tidak tertinggal.
+  Future<void> _cleanUpAfterCancel() async {
+    try {
+      final tripId = widget.booking['id'].toString();
+      final removedIds = await ScheduleService().deleteSchedulesForTrip(tripId);
+      for (final id in removedIds) {
+        await NotificationService.instance.cancelReminderFor(id);
+      }
+      await NotificationService.instance.syncAll();
+    } catch (_) {
+      // Pembatalan sudah berhasil; pembersihan dianggap tambahan.
+    }
+  }
+
+  Widget _voucherSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        const Text(
+          'Voucher perjalanan',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        if (_loadingVouchers)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: LinearProgressIndicator(),
+          )
+        else if (_vouchers.isEmpty)
+          Text(
+            'Belum ada voucher untuk pemesanan ini. Voucher muncul di sini '
+            'setelah admin menerbitkan dan mengaitkannya.',
+            style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+          )
+        else
+          for (final v in _vouchers)
+            Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: safarLightGreen,
+                  child: Icon(Icons.verified_user_outlined, color: safarGreen),
+                ),
+                title: Text(
+                  v['voucher_code']?.toString() ?? '-',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('Tercatat di blockchain'),
+                trailing: IconButton(
+                  tooltip: 'Unduh PDF',
+                  icon: const Icon(Icons.download_rounded),
+                  onPressed: () =>
+                      _downloadVoucher(v['voucher_code'].toString()),
+                ),
+              ),
+            ),
+      ],
+    );
   }
 
   String _formatRupiah(dynamic value) {
@@ -163,6 +269,8 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
           'Pastikan statusnya masih Persiapan.',
         );
       }
+
+      await _cleanUpAfterCancel();
 
       if (!mounted) return;
 
@@ -328,6 +436,37 @@ class _BookingDetailPageState extends State<BookingDetailPage> {
               'Total Pemesanan (Simulasi)',
               totalAmount,
             ),
+            if (_status != 'cancelled') ...[
+              _voucherSection(),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MySchedulePage(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      label: const Text('Agenda'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ExpensePage()),
+                      ),
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      label: const Text('Pengeluaran'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 24),
             if (canCancel)
               SizedBox(

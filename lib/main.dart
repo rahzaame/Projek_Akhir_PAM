@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -10,9 +9,10 @@ import 'supabase_config.dart';
 import 'pages/reset_password_page.dart';
 import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
+import 'services/notification_service.dart';
+import 'tema/tema_app.dart';
 
-final GlobalKey<NavigatorState> appNavigatorKey =
-    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 StreamSubscription<AuthState>? _authSubscription;
 bool _resetPageOpening = false;
@@ -37,6 +37,8 @@ Future<void> main() async {
     },
   );
 
+  await NotificationService.instance.init();
+
   runApp(const SafarMateApp());
 }
 
@@ -49,18 +51,14 @@ void _openResetPasswordPage() {
     final navigator = appNavigatorKey.currentState;
 
     if (navigator == null) {
-      debugPrint(
-        'Navigator belum siap. Event reset password diterima.',
-      );
+      debugPrint('Navigator belum siap. Event reset password diterima.');
       _resetPageOpening = false;
       return;
     }
 
     navigator
         .push(
-          MaterialPageRoute<void>(
-            builder: (_) => const ResetPasswordPage(),
-          ),
+          MaterialPageRoute<void>(builder: (_) => const ResetPasswordPage()),
         )
         .whenComplete(() {
           _resetPageOpening = false;
@@ -77,17 +75,7 @@ class SafarMateApp extends StatelessWidget {
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'SafarMate',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF176B50),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF7F8F5),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF176B50),
-          foregroundColor: Colors.white,
-        ),
-      ),
+      theme: buildAppTheme(),
       home: const AuthGate(),
     );
   }
@@ -100,15 +88,13 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate>
-    with WidgetsBindingObserver {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   bool _checking = true;
   bool _unlocked = false;
   bool _needsAuthentication = false;
 
   final BiometricService _biometric = BiometricService();
-  final BiometricPreferences _preferences =
-      BiometricPreferences();
+  final BiometricPreferences _preferences = BiometricPreferences();
 
   @override
   void initState() {
@@ -199,19 +185,14 @@ class _AuthGateState extends State<AuthGate>
 
   @override
   Widget build(BuildContext context) {
-    final session =
-        Supabase.instance.client.auth.currentSession;
+    final session = Supabase.instance.client.auth.currentSession;
 
     if (session == null) {
       return const LoginPage();
     }
 
     if (_checking) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_unlocked) {

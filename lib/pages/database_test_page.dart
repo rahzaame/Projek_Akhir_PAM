@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,9 +15,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
   final _tripNameController = TextEditingController(
     text: 'Tes Umrah SafarMate',
   );
-  final _originCityController = TextEditingController(
-    text: 'Jakarta',
-  );
+  final _originCityController = TextEditingController(text: 'Jakarta');
 
   DateTime? _departureDate;
   DateTime? _returnDate;
@@ -72,8 +69,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
       if (departure) {
         _departureDate = selected;
 
-        if (_returnDate != null &&
-            _returnDate!.isBefore(selected)) {
+        if (_returnDate != null && _returnDate!.isBefore(selected)) {
           _returnDate = null;
         }
       } else {
@@ -92,8 +88,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
       return;
     }
 
-    if (_returnDate != null &&
-        _returnDate!.isBefore(_departureDate!)) {
+    if (_returnDate != null && _returnDate!.isBefore(_departureDate!)) {
       setState(() {
         _message = 'Tanggal pulang tidak boleh sebelum keberangkatan.';
       });
@@ -121,8 +116,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
         'trip_type': 'umrah',
         'departure_date': _dateToString(_departureDate!),
         'status': 'preparation',
-        if (_returnDate != null)
-          'return_date': _dateToString(_returnDate!),
+        if (_returnDate != null) 'return_date': _dateToString(_returnDate!),
         if (_originCityController.text.trim().isNotEmpty)
           'origin_city': _originCityController.text.trim(),
       };
@@ -136,7 +130,8 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
       if (!mounted) return;
 
       setState(() {
-        _message = 'BERHASIL! Perjalanan tersimpan di Supabase.\n'
+        _message =
+            'BERHASIL! Perjalanan tersimpan di Supabase.\n'
             'ID: ${savedTrip['id']}\n'
             'Nama: ${savedTrip['trip_name']}';
       });
@@ -146,7 +141,8 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
       if (!mounted) return;
 
       setState(() {
-        _message = 'Gagal menyimpan perjalanan.\n'
+        _message =
+            'Gagal menyimpan perjalanan.\n'
             'Pesan: ${error.message}\n'
             'Kode: ${error.code ?? '-'}';
       });
@@ -190,7 +186,8 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
       if (!mounted) return;
 
       setState(() {
-        _message = 'Gagal membaca perjalanan: ${error.message} '
+        _message =
+            'Gagal membaca perjalanan: ${error.message} '
             '(kode ${error.code ?? '-'})';
       });
     } catch (error) {
@@ -257,9 +254,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
               const SizedBox(height: 16),
 
               OutlinedButton.icon(
-                onPressed: _isLoading
-                    ? null
-                    : () => _pickDate(departure: true),
+                onPressed: _isLoading ? null : () => _pickDate(departure: true),
                 icon: const Icon(Icons.calendar_month),
                 label: Text(
                   _departureDate == null
@@ -284,9 +279,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
               ElevatedButton.icon(
                 onPressed: _isLoading ? null : _saveTrip,
                 icon: const Icon(Icons.save_outlined),
-                label: Text(
-                  _isLoading ? 'Menyimpan...' : 'Simpan ke Supabase',
-                ),
+                label: Text(_isLoading ? 'Menyimpan...' : 'Simpan ke Supabase'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF176B50),
                   foregroundColor: Colors.white,
@@ -313,10 +306,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
 
               const Text(
                 'Perjalanan Tersimpan',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
 
@@ -329,9 +319,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
               if (_trips.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'Belum ada perjalanan yang dapat ditampilkan.',
-                  ),
+                  child: Text('Belum ada perjalanan yang dapat ditampilkan.'),
                 ),
 
               ..._trips.map((trip) {
@@ -341,9 +329,7 @@ class _DatabaseTestPageState extends State<DatabaseTestPage> {
                       Icons.luggage_outlined,
                       color: Color(0xFF176B50),
                     ),
-                    title: Text(
-                      trip['trip_name']?.toString() ?? '-',
-                    ),
+                    title: Text(trip['trip_name']?.toString() ?? '-'),
                     subtitle: Text(
                       'Jenis: ${trip['trip_type'] ?? '-'}\n'
                       'Berangkat: ${trip['departure_date'] ?? '-'}\n'

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/blockchain_service.dart';
+import '../services/trip_service.dart';
 import '../services/voucher_document_service.dart';
 import 'admin_voucher_list_page.dart';
 
@@ -20,10 +21,44 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
   final _documentService = VoucherDocumentService();
   final _blockchainService = BlockchainService();
 
+  final _tripService = TripService();
+
+  List<Map<String, dynamic>> _trips = [];
+  Map<String, dynamic>? _selectedTrip;
+
   VoucherPdfData? _pdf;
   bool _loading = false;
   String? _message;
   bool? _messageIsSuccess;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrips();
+  }
+
+  Future<void> _loadTrips() async {
+    try {
+      final rows = await _tripService.fetchAllTrips();
+      if (!mounted) return;
+      setState(() {
+        _trips = rows.where((t) => t['status'] != 'cancelled').toList();
+      });
+    } catch (_) {
+      // Kebijakan admin belum dibuat: voucher tetap bisa didaftarkan tanpa tautan.
+    }
+  }
+
+  Future<void> _removeUploaded(String? path) async {
+    if (path == null) return;
+    try {
+      await Supabase.instance.client.storage.from('voucher-pdfs').remove([
+        path,
+      ]);
+    } catch (_) {
+      // Pembersihan gagal tidak boleh menutupi pesan error utama.
+    }
+  }
 
   @override
   void dispose() {
@@ -52,6 +87,7 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
   }
 
   Future<void> _registerVoucher() async {
+    String? uploadedPath;
     if (!_formKey.currentState!.validate()) return;
 
     if (_pdf == null) {
@@ -89,6 +125,8 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
             ),
           );
 
+      uploadedPath = storagePath;
+
       // Catat hash dokumen ke blockchain.
       final result = await _blockchainService.registerVoucher(
         voucherCode: code,
@@ -100,9 +138,26 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
 
       final success = result['success'] == true;
 
+      var linkNote = '';
+      if (!success) {
+        // Blok gagal dibuat: hapus PDF yang sudah terlanjur diupload.
+        await _removeUploaded(uploadedPath);
+      } else if (_selectedTrip != null) {
+        try {
+          await _tripService.linkVoucher(
+            voucherCode: code,
+            trip: _selectedTrip!,
+          );
+          linkNote =
+              ' Voucher dikaitkan ke ${_selectedTrip!['customer_name']}.';
+        } catch (e) {
+          linkNote = ' Namun voucher gagal dikaitkan ke pemesanan: $e';
+        }
+      }
+
       setState(() {
         _message = success
-            ? 'Voucher berhasil disimpan. Indeks blok: ${result['block_index']}'
+            ? 'Voucher berhasil disimpan. Indeks blok: ${result['block_index']}.$linkNote'
             : 'Registrasi gagal: ${result['message'] ?? 'Kesalahan tidak diketahui'}';
         _messageIsSuccess = success;
       });
@@ -110,9 +165,13 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
       if (success) {
         _codeController.clear();
         _valueController.clear();
-        setState(() => _pdf = null);
+        setState(() {
+          _pdf = null;
+          _selectedTrip = null;
+        });
       }
     } catch (e) {
+      await _removeUploaded(uploadedPath);
       if (!mounted) return;
       setState(() {
         _message = 'Gagal mendaftarkan voucher: $e';
@@ -222,6 +281,40 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
                     return null;
                   },
                 ),
+                if (_trips.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String?>(
+                    key: ValueKey(_selectedTrip?['id']),
+                    initialValue: _selectedTrip?['id']?.toString(),
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Kaitkan ke pemesanan (opsional)',
+                      helperText:
+                          'Jamaah pemilik pemesanan akan melihat voucher ini.',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Tidak dikaitkan'),
+                      ),
+                      for (final t in _trips)
+                        DropdownMenuItem<String?>(
+                          value: t['id'].toString(),
+                          child: Text(
+                            '${t['customer_name'] ?? 'Tanpa nama'} · '
+                            '${t['trip_name'] ?? '-'}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (id) => setState(() {
+                      _selectedTrip = id == null
+                          ? null
+                          : _trips.firstWhere((t) => t['id'].toString() == id);
+                    }),
+                  ),
+                ],
               ],
             ),
           ),

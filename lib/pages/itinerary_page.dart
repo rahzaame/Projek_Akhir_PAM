@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/itinerary_service.dart';
+import 'peta_lokasi_page.dart' show PetaLokasiPage;
 
 class ItineraryPage extends StatefulWidget {
   final Map<String, dynamic>? package;
@@ -226,6 +227,25 @@ class _ItineraryPageState extends State<ItineraryPage> {
                                         ),
                                         const SizedBox(width: 5),
                                         Expanded(child: Text(location)),
+                                        TextButton(
+                                          onPressed: () => Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => PetaLokasiPage(
+                                                initialQuery: location,
+                                              ),
+                                            ),
+                                          ),
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                            ),
+                                            minimumSize: const Size(0, 28),
+                                            tapTargetSize: MaterialTapTargetSize
+                                                .shrinkWrap,
+                                          ),
+                                          child: const Text('Lihat di peta'),
+                                        ),
                                       ],
                                     ),
                                   ],
