@@ -12,6 +12,7 @@ import 'checklist_page.dart';
 import 'itinerary_page.dart';
 import 'admin_itinerary_page.dart';
 import 'admin_packages_page.dart';
+import 'saran_kesan_page.dart';
 import '../services/package_service.dart';
 import 'tata_cara_umrah_page.dart';
 import 'doa_dan_dzikir_page.dart';
@@ -207,25 +208,34 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _loadProfilePhoto() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) {
+      if (!mounted) return;
+
+      setState(() {
+        _profilePhotoUrl = null;
+        _isLoadingPhoto = false;
+      });
+      return;
+    }
+
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-
-      if (user == null) {
-        if (!mounted) return;
-        setState(() => _isLoadingPhoto = false);
-        return;
-      }
-
-      final profile = await Supabase.instance.client
+      final response = await supabase
           .from('profiles')
           .select('profile_photo')
           .eq('id', user.id)
           .maybeSingle();
 
+      final photoUrl = response?['profile_photo']?.toString().trim();
+
       if (!mounted) return;
 
       setState(() {
-        _profilePhotoUrl = profile?['profile_photo'] as String?;
+        _profilePhotoUrl = (photoUrl != null && photoUrl.isNotEmpty)
+            ? photoUrl
+            : null;
         _isLoadingPhoto = false;
       });
     } catch (e) {
@@ -467,10 +477,15 @@ class _DashboardPageState extends State<DashboardPage> {
                 radius: 25,
                 backgroundColor: safarLightGreen,
                 backgroundImage:
-                    _profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty
+                    (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty)
                     ? NetworkImage(_profilePhotoUrl!)
                     : null,
-                child: _profilePhotoUrl == null || _profilePhotoUrl!.isEmpty
+                onBackgroundImageError: _profilePhotoUrl != null
+                    ? (exception, stackTrace) {
+                        debugPrint('Gagal memuat foto profil: $exception');
+                      }
+                    : null,
+                child: (_profilePhotoUrl == null || _profilePhotoUrl!.isEmpty)
                     ? const Icon(
                         Icons.person_rounded,
                         color: safarGreen,
@@ -478,6 +493,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       )
                     : null,
               ),
+
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -837,12 +853,17 @@ class _DashboardPageState extends State<DashboardPage> {
               radius: 28,
               backgroundColor: safarLightGreen,
               backgroundImage:
-                  _profilePhotoUrl != null &&
-                      _profilePhotoUrl!.trim().isNotEmpty
-                  ? NetworkImage(_profilePhotoUrl!)
+                  (_profilePhotoUrl != null &&
+                      _profilePhotoUrl!.trim().isNotEmpty)
+                  ? NetworkImage(_profilePhotoUrl!.trim())
+                  : null,
+              onBackgroundImageError: _profilePhotoUrl != null
+                  ? (exception, stackTrace) {
+                      debugPrint('Gagal memuat foto profil: $exception');
+                    }
                   : null,
               child:
-                  _profilePhotoUrl == null || _profilePhotoUrl!.trim().isEmpty
+                  (_profilePhotoUrl == null || _profilePhotoUrl!.trim().isEmpty)
                   ? const Icon(
                       Icons.person_rounded,
                       color: safarGreen,
@@ -904,7 +925,12 @@ class _DashboardPageState extends State<DashboardPage> {
           Icons.feedback_outlined,
           'Saran dan Kesan',
           'Mata kuliah Pemrograman Aplikasi Mobile',
-          () => _showComingSoon('Saran dan Kesan'),
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SaranKesanPage()),
+            );
+          },
         ),
         _featureTile(
           Icons.notifications_none_rounded,
