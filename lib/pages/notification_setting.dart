@@ -216,15 +216,6 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           runSpacing: 8,
                           children: [
                             OutlinedButton.icon(
-                              onPressed: _hasPermission
-                                  ? () async {
-                                      await _service.showTest();
-                                    }
-                                  : null,
-                              icon: const Icon(Icons.notification_add_outlined),
-                              label: const Text('Kirim tes'),
-                            ),
-                            OutlinedButton.icon(
                               onPressed: () async {
                                 await _service.syncAll();
                                 final pending = await _service.pendingCount();

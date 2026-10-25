@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_config.dart';
 import 'pages/login_page.dart';
 import 'pages/dashboard_page.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,8 @@ Future<void> main() async {
     url: SupabaseConfig.projectUrl,
     anonKey: SupabaseConfig.publishableKey,
   );
+
+  await NotificationService.instance.init();
 
   runApp(const SafarMateApp());
 }
