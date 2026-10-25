@@ -1,16 +1,54 @@
-
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'custom_encryption.dart'; // sesuaikan dengan nama file enkripsimu
 
 class SupabaseService {
   final SupabaseClient _client = Supabase.instance.client;
+
+  static const int maxPasswordLength = 50;
+
+  /// Mengenkripsi password dengan algoritma buatan sendiri.
+  String _protect(String password) => CustomEncryption.encrypt(password);
 
   Future<AuthResponse> signIn({
     required String email,
     required String password,
   }) async {
-    return await _client.auth.signInWithPassword(
+    try {
+      return await _client.auth.signInWithPassword(
+        email: email.trim(),
+        password: _protect(password),
+      );
+        } on AuthApiException catch (e) {
+      final pesan = e.message.toLowerCase();
+      if (pesan.contains('confirm') || pesan.contains('rate limit')) {
+        rethrow;
+      }
+      if (e.statusCode != '400') rethrow;
+      return await _client.auth.signInWithPassword(
+        email: email.trim(),
+        password: password,
+      );
+    }
+  }
+
+  /// Registrasi: password dikirim dalam bentuk terenkripsi.
+  Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+    Map<String, dynamic>? data,
+  }) async {
+    return await _client.auth.signUp(
       email: email.trim(),
-      password: password,
+      password: _protect(password),
+      data: data,
+    );
+  }
+
+  /// Ganti password (alur reset/ubah password).
+  Future<UserResponse> updatePassword(String newPassword) async {
+    return await _client.auth.updateUser(
+      UserAttributes(password: _protect(newPassword)),
     );
   }
 

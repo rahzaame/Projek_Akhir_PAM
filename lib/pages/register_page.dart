@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -21,7 +22,6 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
 
-
   final _supabase = Supabase.instance.client;
 
   @override
@@ -39,7 +39,7 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await _supabase.auth.signUp(
+      final response = await SupabaseService().signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         data: {'full_name': _nameController.text.trim()},
