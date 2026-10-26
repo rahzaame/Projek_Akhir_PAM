@@ -173,22 +173,7 @@ class _RiwayatBlockchainPageState extends State<RiwayatBlockchainPage> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
               children: [
-                const Text(
-                  'Perjalanan Anda',
-                  style: TextStyle(
-                    color: _textDark,
-                    fontSize: 23,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Lihat dan unduh dokumen voucher Anda.',
-                  style: TextStyle(color: _textMuted, fontSize: 14),
-                ),
-                const SizedBox(height: 20),
 
-                // Ringkasan jumlah voucher aktif.
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(

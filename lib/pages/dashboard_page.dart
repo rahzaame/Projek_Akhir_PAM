@@ -685,7 +685,7 @@ class _DashboardPageState extends State<DashboardPage> {
             _featureTile(
               Icons.history_rounded,
               'Riwayat Pemesanan',
-              'Status, voucher, dan detail pemesanan',
+              'Status, dan detail pemesanan',
               _openBookingHistory,
             ),
             _featureTile(

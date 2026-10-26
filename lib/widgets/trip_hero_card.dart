@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../pages/riwayat_blockchain_page.dart';
 
 import '../services/notification_service.dart';
 import '../services/trip_service.dart';
@@ -305,7 +306,14 @@ class _TripHeroCardState extends State<TripHeroCard> {
                 data.voucherCount > 0
                     ? 'Voucher (${data.voucherCount})'
                     : 'Voucher & detail',
-                widget.onOpenBookings,
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const RiwayatBlockchainPage(),
+                    ),
+                  );
+                },
               ),
             ],
           ),
