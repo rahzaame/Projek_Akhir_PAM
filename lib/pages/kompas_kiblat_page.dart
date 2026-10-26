@@ -270,6 +270,7 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
             ),
           ),
           const SizedBox(height: 24),
+
           Center(
             child: SizedBox(
               width: 310,
@@ -277,6 +278,7 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
+                  // Lingkaran kompas.
                   Container(
                     width: 292,
                     height: 292,
@@ -293,8 +295,16 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
                       ],
                     ),
                   ),
+
+                  // Garis penanda pada lingkaran.
                   ...List.generate(36, (index) {
-                    final isMajor = index % 9 == 0;
+                    // Hilangkan garis pada posisi U, T, S, dan B.
+                    if (index % 9 == 0) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final isMajor = index % 3 == 0;
+
                     return Transform.rotate(
                       angle: index * 10 * math.pi / 180,
                       child: Align(
@@ -311,6 +321,8 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
                       ),
                     );
                   }),
+
+                  // Arah mata angin tetap pada tempatnya.
                   const Positioned(
                     top: 22,
                     child: Text(
@@ -355,35 +367,32 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
                       ),
                     ),
                   ),
-                  if (qibla != null)
+
+                  if (qibla != null && heading != null) ...[
+                    // HANYA JARUM yang berputar.
                     Transform.rotate(
-                      angle: heading != null ? relativeAngle : 0.0,
-                      child: SizedBox(
-                        width: 220,
-                        height: 220,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Jarum dua warna yang menunjuk ke arah kiblat.
-                            CustomPaint(
-                              size: const Size(170, 210),
-                              painter: _CompassNeedlePainter(),
-                            ),
-                            const Positioned(top: 0, child: _KaabaMarker()),
-                            Container(
-                              width: 18,
-                              height: 18,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: green, width: 3),
-                              ),
-                            ),
-                          ],
-                        ),
+                      angle: relativeAngle,
+                      child: CustomPaint(
+                        size: const Size(170, 210),
+                        painter: _CompassNeedlePainter(),
                       ),
-                    )
-                  else
+                    ),
+
+                    // Titik pusat jarum tetap di tengah.
+                    Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: green, width: 3),
+                      ),
+                    ),
+
+                    // LOGO KA'BAH DI LUAR Transform.rotate.
+                    // Dengan demikian, logo tidak ikut berputar.
+                    const Positioned(left: 65, top: 65, child: _KaabaMarker()),
+                  ] else
                     const Icon(
                       Icons.explore_outlined,
                       size: 100,
@@ -393,6 +402,7 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
               ),
             ),
           ),
+
           const SizedBox(height: 22),
           Card(
             elevation: 0,
