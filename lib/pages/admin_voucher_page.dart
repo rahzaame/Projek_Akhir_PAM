@@ -18,6 +18,10 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
   final _codeController = TextEditingController();
   final _valueController = TextEditingController();
 
+  String _selectedCurrency = 'IDR';
+
+  final List<String> _currencies = ['IDR', 'SAR', 'TRY'];
+
   final _documentService = VoucherDocumentService();
   final _blockchainService = BlockchainService();
 
@@ -88,6 +92,7 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
 
   Future<void> _registerVoucher() async {
     String? uploadedPath;
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_pdf == null) {
@@ -108,10 +113,11 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
         _valueController.text.trim().replaceAll(',', '.'),
       );
 
-      final code = _codeController.text.trim();
+      final code = _codeController.text.trim().toUpperCase();
+      final currency = _selectedCurrency;
       final pdf = _pdf!;
 
-      // Simpan PDF di Supabase Storage terlebih dahulu.
+      // Upload PDF voucher ke Supabase Storage.
       final storagePath = '$code.pdf';
 
       await Supabase.instance.client.storage
@@ -127,58 +133,82 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
 
       uploadedPath = storagePath;
 
-      // Catat hash dokumen ke blockchain.
+      // Simpan data voucher dan mata uang ke blockchain.
       final result = await _blockchainService.registerVoucher(
         voucherCode: code,
         voucherValue: value,
+        voucherCurrency: currency,
         documentHash: pdf.hash,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        // Jika widget sudah ditutup, bersihkan file bila registrasi gagal.
+        if (result['success'] != true) {
+          await _removeUploaded(uploadedPath);
+        }
+        return;
+      }
 
       final success = result['success'] == true;
 
       var linkNote = '';
+
       if (!success) {
-        // Blok gagal dibuat: hapus PDF yang sudah terlanjur diupload.
+        // Registrasi blockchain gagal: hapus PDF yang sudah diupload.
         await _removeUploaded(uploadedPath);
+        uploadedPath = null;
       } else if (_selectedTrip != null) {
         try {
           await _tripService.linkVoucher(
             voucherCode: code,
             trip: _selectedTrip!,
           );
+
           linkNote =
-              ' Voucher dikaitkan ke ${_selectedTrip!['customer_name']}.';
+              ' Voucher dikaitkan ke '
+              '${_selectedTrip!['customer_name'] ?? 'pemesanan'}.';
         } catch (e) {
           linkNote = ' Namun voucher gagal dikaitkan ke pemesanan: $e';
         }
       }
 
+      if (!mounted) return;
+
       setState(() {
         _message = success
-            ? 'Voucher berhasil disimpan. Indeks blok: ${result['block_index']}.$linkNote'
-            : 'Registrasi gagal: ${result['message'] ?? 'Kesalahan tidak diketahui'}';
+            ? 'Voucher berhasil disimpan. '
+                  'Nominal: $currency ${value.toStringAsFixed(2)}. '
+                  'Indeks blok: ${result['block_index']}.$linkNote'
+            : 'Registrasi gagal: '
+                  '${result['message'] ?? 'Kesalahan tidak diketahui'}';
+
         _messageIsSuccess = success;
       });
 
       if (success) {
         _codeController.clear();
         _valueController.clear();
+
         setState(() {
           _pdf = null;
           _selectedTrip = null;
+          _selectedCurrency = 'SAR';
         });
       }
     } catch (e) {
+      // Hapus file yang sempat diupload jika proses mengalami error.
       await _removeUploaded(uploadedPath);
+
       if (!mounted) return;
+
       setState(() {
         _message = 'Gagal mendaftarkan voucher: $e';
         _messageIsSuccess = false;
       });
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -246,43 +276,99 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
             style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
+
           Form(
             key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Kode voucher
                 TextFormField(
                   controller: _codeController,
+                  textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(
                     labelText: 'Kode voucher',
+                    hintText: 'Contoh: VCR001',
+                    prefixIcon: Icon(Icons.confirmation_number_outlined),
                     border: OutlineInputBorder(),
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? 'Kode voucher wajib diisi'
-                      : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Kode voucher wajib diisi';
+                    }
+                    return null;
+                  },
                 ),
+
                 const SizedBox(height: 14),
+
+                // Dropdown mata uang
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCurrency,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Mata uang',
+                    prefixIcon: Icon(Icons.currency_exchange),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem<String>(
+                      value: 'IDR',
+                      child: Text('IDR - Rupiah Indonesia'),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: 'SAR',
+                      child: Text('SAR - Riyal Saudi'),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: 'TRY',
+                      child: Text('TRY - Lira Turki'),
+                    ),
+                  ],
+                  onChanged: _loading
+                      ? null
+                      : (currency) {
+                          if (currency == null) return;
+                          setState(() {
+                            _selectedCurrency = currency;
+                          });
+                        },
+                ),
+
+                const SizedBox(height: 14),
+
+                // Nominal voucher
                 TextFormField(
                   controller: _valueController,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Nominal voucher',
-                    prefixText: 'SAR ',
-                    border: OutlineInputBorder(),
+                    hintText: 'Masukkan nominal',
+                    prefixText: '$_selectedCurrency ',
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                    border: const OutlineInputBorder(),
                   ),
                   validator: (v) {
-                    final value = double.tryParse(
-                      (v ?? '').trim().replaceAll(',', '.'),
-                    );
-                    if (value == null || value <= 0) {
+                    final input = (v ?? '').trim().replaceAll(',', '.');
+                    final value = double.tryParse(input);
+
+                    if (input.isEmpty ||
+                        value == null ||
+                        !value.isFinite ||
+                        value <= 0) {
                       return 'Masukkan nominal yang valid';
                     }
+
                     return null;
                   },
                 ),
+
+                // Pemesanan opsional
                 if (_trips.isNotEmpty) ...[
                   const SizedBox(height: 14),
+
                   DropdownButtonFormField<String?>(
                     key: ValueKey(_selectedTrip?['id']),
                     initialValue: _selectedTrip?['id']?.toString(),
@@ -291,6 +377,7 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
                       labelText: 'Kaitkan ke pemesanan (opsional)',
                       helperText:
                           'Jamaah pemilik pemesanan akan melihat voucher ini.',
+                      prefixIcon: Icon(Icons.link),
                       border: OutlineInputBorder(),
                     ),
                     items: [
@@ -298,26 +385,34 @@ class _AdminVoucherPageState extends State<AdminVoucherPage> {
                         value: null,
                         child: Text('Tidak dikaitkan'),
                       ),
-                      for (final t in _trips)
-                        DropdownMenuItem<String?>(
-                          value: t['id'].toString(),
+                      ..._trips.map(
+                        (trip) => DropdownMenuItem<String?>(
+                          value: trip['id'].toString(),
                           child: Text(
-                            '${t['customer_name'] ?? 'Tanpa nama'} · '
-                            '${t['trip_name'] ?? '-'}',
+                            '${trip['customer_name'] ?? 'Tanpa nama'} · '
+                            '${trip['trip_name'] ?? '-'}',
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                      ),
                     ],
-                    onChanged: (id) => setState(() {
-                      _selectedTrip = id == null
-                          ? null
-                          : _trips.firstWhere((t) => t['id'].toString() == id);
-                    }),
+                    onChanged: _loading
+                        ? null
+                        : (id) {
+                            setState(() {
+                              _selectedTrip = id == null
+                                  ? null
+                                  : _trips.firstWhere(
+                                      (trip) => trip['id'].toString() == id,
+                                    );
+                            });
+                          },
                   ),
                 ],
               ],
             ),
           ),
+
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: _loading ? null : _pickPdf,

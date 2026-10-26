@@ -101,6 +101,19 @@ class _RiwayatBlockchainPageState extends State<RiwayatBlockchainPage> {
     return '$day $month $year • $hour:$minute';
   }
 
+  String _formatVoucherValue(dynamic value) {
+    if (value == null) return '-';
+
+    final amount = double.tryParse(value.toString());
+    if (amount == null) return value.toString();
+
+    if (amount == amount.truncateToDouble()) {
+      return amount.toStringAsFixed(0);
+    }
+
+    return amount.toStringAsFixed(2);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,7 +186,6 @@ class _RiwayatBlockchainPageState extends State<RiwayatBlockchainPage> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
               children: [
-
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -249,7 +261,13 @@ class _RiwayatBlockchainPageState extends State<RiwayatBlockchainPage> {
   }
 
   Widget _buildVoucherCard(Map<String, dynamic> voucher) {
-    final code = voucher['voucher_code'].toString();
+     debugPrint('DATA VOUCHER JAMAAH: $voucher');
+     
+    final code = (voucher['voucher_code'] ?? '').toString();
+    final value = voucher['voucher_value'];
+    final currency = (voucher['voucher_currency'] ?? 'SAR')
+        .toString()
+        .toUpperCase();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -337,6 +355,61 @@ class _RiwayatBlockchainPageState extends State<RiwayatBlockchainPage> {
                   ],
                 ),
                 const SizedBox(height: 18),
+
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7F3EC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFD2E8DA)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        height: 42,
+                        width: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.payments_outlined,
+                          color: _green,
+                          size: 23,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'NOMINAL VOUCHER',
+                              style: TextStyle(
+                                color: _textMuted,
+                                fontSize: 10,
+                                letterSpacing: 1.0,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              '$currency ${_formatVoucherValue(value)}',
+                              style: const TextStyle(
+                                color: _green,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(

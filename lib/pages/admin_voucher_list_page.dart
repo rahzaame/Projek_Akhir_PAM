@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -89,6 +90,35 @@ class _AdminVoucherListPageState extends State<AdminVoucherListPage> {
     final minute = local.minute.toString().padLeft(2, '0');
 
     return '$day/$month/$year • $hour:$minute';
+  }
+
+  // Membaca mata uang dari kolom voucher_currency di database.
+  // SAR hanya digunakan sebagai fallback jika nilainya kosong.
+  String _getVoucherCurrency(Map<String, dynamic> voucher) {
+    final currency = voucher['voucher_currency']
+        ?.toString()
+        .trim()
+        .toUpperCase();
+
+    if (currency == null || currency.isEmpty) {
+      return 'SAR';
+    }
+
+    return currency;
+  }
+
+  // Menampilkan nominal tanpa mengubah desain halaman.
+  String _formatVoucherValue(dynamic value) {
+    if (value == null) return '-';
+
+    if (value is num) {
+      return value.toString();
+    }
+
+    final text = value.toString().trim();
+    if (text.isEmpty) return '-';
+
+    return text;
   }
 
   @override
@@ -241,6 +271,8 @@ class _AdminVoucherListPageState extends State<AdminVoucherListPage> {
   Widget _buildVoucherCard(Map<String, dynamic> voucher) {
     final code = (voucher['voucher_code'] ?? '').toString();
     final value = voucher['voucher_value'];
+    final currency = _getVoucherCurrency(voucher);
+    final formattedValue = _formatVoucherValue(value);
     final status = (voucher['voucher_status'] ?? 'unknown').toString();
 
     return Card(
@@ -298,7 +330,11 @@ class _AdminVoucherListPageState extends State<AdminVoucherListPage> {
               ],
             ),
             const Divider(height: 26),
-            _infoRow(Icons.payments_outlined, 'Nominal', 'SAR ${value ?? '-'}'),
+            _infoRow(
+              Icons.payments_outlined,
+              'Nominal',
+              '$currency $formattedValue',
+            ),
             const SizedBox(height: 12),
             _infoRow(
               Icons.tag,
