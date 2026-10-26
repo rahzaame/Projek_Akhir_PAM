@@ -232,6 +232,13 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Catatan: pengingat dapat tertunda beberapa menit karena '
+                  'penghematan baterai Android. Jika pengingat tidak muncul, '
+                  'pastikan SafarMate tidak dibatasi di pengaturan baterai.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
               ],
             ),
     );
