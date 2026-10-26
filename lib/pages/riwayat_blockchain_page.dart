@@ -76,6 +76,34 @@ class _RiwayatBlockchainPageState
     );
   }
 
+  Future<void> _openStoreMap(String storeName, String storeAddress) async {
+    final query = '$storeName, $storeAddress'.trim();
+    if (query.isEmpty) {
+      _showMessage('Informasi lokasi toko belum tersedia.');
+      return;
+    }
+
+    final uri = Uri.https(
+      'www.google.com',
+      '/maps/search/',
+      {'api': '1', 'query': query},
+    );
+
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        _showMessage('Google Maps tidak dapat dibuka.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showMessage('Gagal membuka Google Maps. Coba lagi.');
+      }
+    }
+  }
+
   String _formatDate(dynamic value) {
     final timestamp = DateTime.tryParse(
       (value ?? '').toString(),
@@ -179,7 +207,7 @@ class _RiwayatBlockchainPageState
             color: _green,
             onRefresh: _refresh,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
               children: [
                 const Text(
                   'Perjalanan Anda',
@@ -405,6 +433,101 @@ class _RiwayatBlockchainPageState
                     ],
                   ),
                 ),
+                // Informasi toko dan tombol lokasi Google Maps.
+                Builder(
+                  builder: (context) {
+                    final storeName =
+                        (voucher['voucher_store_name'] ?? '').toString().trim();
+                    final storeAddress =
+                        (voucher['voucher_store_address'] ?? '').toString().trim();
+                    if (storeName.isEmpty && storeAddress.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F7F3),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFDCE9DF)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.storefront_outlined,
+                                  color: _green, size: 19),
+                              SizedBox(width: 8),
+                              Text(
+                                'Lokasi penukaran',
+                                style: TextStyle(
+                                  color: _textDark,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (storeName.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              storeName,
+                              style: const TextStyle(
+                                color: _textDark,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                          if (storeAddress.isNotEmpty) ...[
+                            const SizedBox(height: 5),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.location_on_outlined,
+                                    color: _textMuted, size: 17),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    storeAddress,
+                                    style: const TextStyle(
+                                      color: _textMuted,
+                                      fontSize: 12,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: storeAddress.isEmpty && storeName.isEmpty
+                                  ? null
+                                  : () => _openStoreMap(storeName, storeAddress),
+                              icon: const Icon(Icons.map_outlined, size: 18),
+                              label: const Text('Lihat lokasi di Google Maps'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _green,
+                                side: const BorderSide(color: _green),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
