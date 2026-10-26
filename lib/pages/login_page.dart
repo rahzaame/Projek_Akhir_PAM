@@ -70,6 +70,12 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
+  Future<BiometricStatus> _refreshBiometricStatus() async {
+    final status = await _biometric.status();
+    if (mounted) setState(() => _biometricStatus = status);
+    return status;
+  }
+
   void _snack(String message, {bool error = false}) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -100,7 +106,8 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _syncBiometric(String email, String password) async {
     try {
-      if (_biometricStatus != BiometricStatus.available) return;
+      final status = await _biometric.status();
+      if (status != BiometricStatus.available) return;
 
       if (await _biometricPrefs.isEnabled()) {
         await _credentials.save(email: email, password: password);
@@ -192,14 +199,16 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _loginWithBiometric() async {
     if (_biometricBusy || _isLoading) return;
 
-    if (_biometricStatus != BiometricStatus.available) {
-      _snack(_biometric.messageFor(_biometricStatus));
-      return;
-    }
-
     setState(() => _biometricBusy = true);
 
     try {
+      final status = await _refreshBiometricStatus();
+      if (status != BiometricStatus.available) {
+        if (!mounted) return;
+        _snack(_biometric.messageFor(status));
+        return;
+      }
+
       final enabled = await _biometricPrefs.isEnabled();
       final saved = await _credentials.read();
 
@@ -233,7 +242,6 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       _goToApp();
     } on AuthApiException catch (error) {
-      // Password berubah / akun tidak valid: hapus kredensial lama.
       if (error.message.toLowerCase().contains('invalid')) {
         await _credentials.clear();
         if (!mounted) return;
@@ -334,8 +342,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final showBiometric = _biometricStatus != BiometricStatus.notSupported;
-
     return Scaffold(
       backgroundColor: const Color(0xFFFCFCF9),
       body: SafeArea(
@@ -543,10 +549,8 @@ class _LoginPageState extends State<LoginPage> {
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
-                  if (showBiometric) ...[
-                    const SizedBox(height: 16),
-                    _buildBiometricButton(),
-                  ],
+                  const SizedBox(height: 16),
+                  _buildBiometricButton(),
                   const SizedBox(height: 16),
                 ],
               ),

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/biometric_credentials.dart';
 import '../services/biometric_preferences.dart';
+import '../services/biometric_service.dart';
+import '../services/supabase_service.dart';
 import 'admin_voucher_page.dart';
 import 'riwayat_blockchain_page.dart';
 import 'profile_page.dart';
@@ -61,6 +64,8 @@ class _DashboardPageState extends State<DashboardPage> {
   ];
 
   final _biometricPreferences = BiometricPreferences();
+  final _biometricService = BiometricService();
+  final _biometricCredentials = BiometricCredentials();
 
   bool _biometricEnabled = false;
   bool _isLoadingBiometric = true;
@@ -87,6 +92,59 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<String?> _askPassword() async {
+    final controller = TextEditingController();
+    bool hide = true;
+
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Konfirmasi password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Masukkan password akunmu agar bisa masuk dengan biometrik '
+                'dari halaman login.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                obscureText: hide,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    onPressed: () => setDialogState(() => hide = !hide),
+                    icon: Icon(
+                      hide
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: safarGreen),
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('Aktifkan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _toggleBiometric(bool value) async {
     if (_isUpdatingBiometric) return;
 
@@ -94,7 +152,53 @@ class _DashboardPageState extends State<DashboardPage> {
       _isUpdatingBiometric = true;
     });
 
+    void snack(String message) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
+
     try {
+      if (value) {
+        // 1. Perangkat harus punya biometrik yang terdaftar.
+        final status = await _biometricService.status();
+        if (status != BiometricStatus.available) {
+          snack(_biometricService.messageFor(status));
+          return;
+        }
+
+        final email = Supabase.instance.client.auth.currentUser?.email;
+        if (email == null || email.isEmpty) {
+          snack('Email akun tidak ditemukan. Silakan login ulang.');
+          return;
+        }
+
+        // 2. Konfirmasi password, lalu pastikan benar.
+        final password = await _askPassword();
+        if (password == null || password.isEmpty) return;
+
+        try {
+          await SupabaseService().signIn(email: email, password: password);
+        } on AuthException {
+          snack('Password salah. Login biometrik tidak diaktifkan.');
+          return;
+        }
+
+        // 3. Uji biometrik sekali.
+        final ok = await _biometricService.authenticate(
+          reason: 'Verifikasi untuk mengaktifkan login biometrik',
+        );
+        if (!ok) {
+          snack('Verifikasi biometrik gagal.');
+          return;
+        }
+
+        await _biometricCredentials.save(email: email, password: password);
+      } else {
+        // Nonaktif: hapus juga kredensial yang tersimpan di perangkat.
+        await _biometricCredentials.clear();
+      }
+
       await _biometricPreferences.setEnabled(value);
 
       if (!mounted) return;
@@ -103,23 +207,14 @@ class _DashboardPageState extends State<DashboardPage> {
         _biometricEnabled = value;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            value
-                ? 'Login biometrik diaktifkan.'
-                : 'Login biometrik dinonaktifkan.',
-          ),
-        ),
+      snack(
+        value
+            ? 'Login biometrik diaktifkan. Kamu bisa memakainya di halaman login.'
+            : 'Login biometrik dinonaktifkan.',
       );
     } catch (e) {
       debugPrint('Gagal menyimpan pengaturan biometrik: $e');
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal mengubah pengaturan biometrik.')),
-      );
+      snack('Gagal mengubah pengaturan biometrik.');
     } finally {
       if (mounted) {
         setState(() {
@@ -315,6 +410,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _openFeaturePage(const BookingHistoryPage());
   }
 
+  // Menu Jadwal: tampilkan daftar paket terlebih dahulu.
   Future<void> _openItineraryPackages() async {
     try {
       final packages = await PackageService().getPackages();
@@ -922,6 +1018,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'Pengingat agenda, keberangkatan, dan checklist',
           () => _openFeaturePage(const NotificationSettingsPage()),
         ),
+        // Hanya muncul untuk akun jamaah (bukan admin).
         if (!_isAdmin)
           _featureTile(
             Icons.verified_user_outlined,

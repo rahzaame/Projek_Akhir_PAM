@@ -216,15 +216,6 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           runSpacing: 8,
                           children: [
                             OutlinedButton.icon(
-                              onPressed: _hasPermission
-                                  ? () async {
-                                      await _service.showTest();
-                                    }
-                                  : null,
-                              icon: const Icon(Icons.notification_add_outlined),
-                              label: const Text('Kirim tes'),
-                            ),
-                            OutlinedButton.icon(
                               onPressed: () async {
                                 await _service.syncAll();
                                 final pending = await _service.pendingCount();
@@ -240,13 +231,6 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Catatan: pengingat dapat tertunda beberapa menit karena '
-                  'penghematan baterai Android. Jika pengingat tidak muncul, '
-                  'pastikan SafarMate tidak dibatasi di pengaturan baterai.',
-                  style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],
             ),

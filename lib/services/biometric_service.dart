@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
 
 enum BiometricStatus { available, notEnrolled, notSupported }
@@ -14,7 +15,8 @@ class BiometricService {
       return biometrics.isEmpty
           ? BiometricStatus.notEnrolled
           : BiometricStatus.available;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Status biometrik error: $e');
       return BiometricStatus.notSupported;
     }
   }
@@ -45,9 +47,11 @@ class BiometricService {
         localizedReason: reason,
         biometricOnly: true,
       );
-    } on LocalAuthException {
+    } on LocalAuthException catch (e) {
+      debugPrint('Autentikasi biometrik ditolak: ${e.code}');
       return false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Autentikasi biometrik error: $e');
       return false;
     }
   }

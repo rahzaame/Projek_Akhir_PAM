@@ -54,6 +54,12 @@ class _RegisterPageState extends State<RegisterPage> {
             : 'Akun berhasil dibuat. Periksa email untuk verifikasi '
                   'sebelum login.';
 
+        if (response.session != null) {
+          await SupabaseService().signOut();
+        }
+
+        if (!mounted) return;
+
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(message)));
 
