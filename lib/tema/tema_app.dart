@@ -71,7 +71,10 @@ ThemeData buildAppTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 14,
+      ),
       border: border(AppColors.outline),
       enabledBorder: border(AppColors.outline),
       focusedBorder: border(AppColors.green, 1.6),
@@ -81,24 +84,39 @@ ThemeData buildAppTheme() {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+        ),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         minimumSize: const Size(0, 50),
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        textStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(0, 48),
         foregroundColor: AppColors.green,
-        side: const BorderSide(color: AppColors.outline, width: 1.2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        side: const BorderSide(
+          color: AppColors.outline,
+          width: 1.2,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
       ),
     ),
@@ -121,16 +139,31 @@ ThemeData buildAppTheme() {
         );
       }),
     ),
+
     chipTheme: ChipThemeData(
       backgroundColor: Colors.white,
-      selectedColor: AppColors.greenSoft,
+      selectedColor: AppColors.green,
       side: const BorderSide(color: AppColors.outline),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w500),
+      labelStyle: const TextStyle(
+        fontWeight: FontWeight.w500,
+        color: AppColors.green,
+      ),
+
+      secondaryLabelStyle: const TextStyle(
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      checkmarkColor: Colors.white,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
     ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: Colors.white,
@@ -140,7 +173,9 @@ ThemeData buildAppTheme() {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
     ),
     dividerTheme: const DividerThemeData(
       color: AppColors.outline,

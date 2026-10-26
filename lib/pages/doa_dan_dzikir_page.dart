@@ -349,15 +349,6 @@ class _DoaDanDzikirPageState extends State<DoaDanDzikirPage> {
                 return ChoiceChip(
                   label: Text(category),
                   selected: selected,
-                  selectedColor: safarLightGreen,
-                  backgroundColor: Colors.white,
-                  labelStyle: TextStyle(
-                    color: selected ? safarGreen : Colors.black87,
-                    fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  side: BorderSide(
-                    color: selected ? safarGreen : Colors.black12,
-                  ),
                   onSelected: (_) {
                     setState(() => selectedCategory = category);
                   },
