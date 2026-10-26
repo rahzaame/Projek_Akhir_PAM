@@ -201,145 +201,385 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
   Widget build(BuildContext context) {
     final qibla = _qiblaBearing;
     final heading = _heading;
-
-    // Arah kiblat relatif terhadap bagian atas perangkat.
     final relativeAngle = qibla != null && heading != null
         ? (qibla - heading) * math.pi / 180
         : 0.0;
 
+    const green = Color(0xFF176B50);
+    const lightGreen = Color(0xFFEAF4EF);
+    const background = Color(0xFFF7F8F5);
+
     return Scaffold(
+      backgroundColor: background,
       appBar: AppBar(
         title: const Text('Kompas Kiblat'),
-        backgroundColor: const Color(0xFF176B4D),
+        backgroundColor: green,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      backgroundColor: const Color(0xFFF5F8F5),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
         children: [
           const Text(
-            'Arah Kiblat',
+            'Kompas Arah Kiblat',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: green,
+              fontSize: 25,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
-          Text(
-            qibla == null
-                ? 'Menunggu lokasi...'
-                : '${qibla.toStringAsFixed(1)}° dari utara',
+          const Text(
+            'Arahkan perangkat untuk menemukan arah menuju Ka’bah.',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 17),
+            style: TextStyle(color: Color(0xFF60756A), height: 1.4),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 22),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            decoration: BoxDecoration(
+              color: lightGreen,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'ARAH KIBLAT',
+                  style: TextStyle(
+                    color: Color(0xFF60756A),
+                    fontSize: 12,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  qibla == null ? '--°' : '${qibla.toStringAsFixed(0)}°',
+                  style: const TextStyle(
+                    color: green,
+                    fontSize: 34,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  qibla == null ? 'Menunggu lokasi' : _directionName(qibla),
+                  style: const TextStyle(color: green, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           Center(
             child: SizedBox(
-              width: 280,
-              height: 280,
+              width: 310,
+              height: 310,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   Container(
-                    width: 270,
-                    height: 270,
+                    width: 292,
+                    height: 292,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
                       color: Colors.white,
-                      border: Border.all(
-                        color: const Color(0xFF176B4D),
-                        width: 3,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: green, width: 4),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x14233D30),
+                          blurRadius: 14,
+                          offset: Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ...List.generate(36, (index) {
+                    final isMajor = index % 9 == 0;
+                    return Transform.rotate(
+                      angle: index * 10 * math.pi / 180,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          margin: const EdgeInsets.only(top: 14),
+                          width: isMajor ? 3 : 1.5,
+                          height: isMajor ? 17 : 8,
+                          decoration: BoxDecoration(
+                            color: isMajor ? green : const Color(0xFFB7D9C8),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  const Positioned(
+                    top: 22,
+                    child: Text(
+                      'U',
+                      style: TextStyle(
+                        color: green,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   const Positioned(
-                    top: 18,
+                    bottom: 22,
                     child: Text(
-                      'U',
+                      'S',
                       style: TextStyle(
+                        color: green,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        fontSize: 20,
                       ),
                     ),
                   ),
-                  const Positioned(bottom: 18, child: Text('S')),
-                  const Positioned(left: 18, child: Text('B')),
-                  const Positioned(right: 18, child: Text('T')),
-                  if (heading != null && qibla != null)
+                  const Positioned(
+                    left: 22,
+                    child: Text(
+                      'B',
+                      style: TextStyle(
+                        color: green,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const Positioned(
+                    right: 22,
+                    child: Text(
+                      'T',
+                      style: TextStyle(
+                        color: green,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (qibla != null)
                     Transform.rotate(
-                      angle: relativeAngle,
-                      child: const Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.navigation,
-                            color: Color(0xFF176B4D),
-                            size: 100,
-                          ),
-                          Text(
-                            'KIBLAT',
-                            style: TextStyle(
-                              color: Color(0xFF176B4D),
-                              fontWeight: FontWeight.bold,
+                      angle: heading != null ? relativeAngle : 0.0,
+                      child: SizedBox(
+                        width: 220,
+                        height: 220,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Jarum dua warna yang menunjuk ke arah kiblat.
+                            CustomPaint(
+                              size: const Size(170, 210),
+                              painter: _CompassNeedlePainter(),
                             ),
-                          ),
-                        ],
+                            const Positioned(top: 0, child: _KaabaMarker()),
+                            Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: green, width: 3),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   else
                     const Icon(
                       Icons.explore_outlined,
-                      size: 90,
-                      color: Colors.grey,
+                      size: 100,
+                      color: Color(0xFF9AB8A8),
                     ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 22),
           Card(
+            elevation: 0,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: ListTile(
-              leading: Icon(
-                _sensorAvailable ? Icons.check_circle : Icons.info_outline,
-                color: _sensorAvailable ? Colors.green : Colors.orange,
+              leading: CircleAvatar(
+                backgroundColor: lightGreen,
+                child: Icon(
+                  _sensorAvailable ? Icons.check_circle : Icons.info_outline,
+                  color: green,
+                ),
               ),
-              title: Text(_status),
+              title: Text(
+                _status,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               subtitle: Text(
                 heading == null
                     ? 'Arah perangkat belum tersedia.'
-                    : 'Arah perangkat: ${heading.toStringAsFixed(1)}°',
+                    : 'Arah kompas ${heading.toStringAsFixed(0)}° (${_directionName(heading)})',
               ),
             ),
           ),
-          if (_position != null)
+          if (_position != null) ...[
+            const SizedBox(height: 10),
             Card(
+              elevation: 0,
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: ListTile(
-                leading: const Icon(Icons.location_on_outlined),
-                title: const Text('Lokasi perangkat'),
+                leading: const CircleAvatar(
+                  backgroundColor: lightGreen,
+                  child: Icon(Icons.location_on_outlined, color: green),
+                ),
+                title: const Text(
+                  'Lokasi Perangkat',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                 subtitle: Text(
-                  '${_position!.latitude.toStringAsFixed(5)}, '
-                  '${_position!.longitude.toStringAsFixed(5)}',
+                  '${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}',
                 ),
               ),
             ),
-          const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _loading ? null : _getLocation,
             icon: const Icon(Icons.my_location),
-            label: Text(_loading ? 'Mengambil lokasi...' : 'Perbarui lokasi'),
+            label: Text(_loading ? 'Mengambil lokasi...' : 'Perbarui Lokasi'),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF176B4D),
-              padding: const EdgeInsets.all(14),
+              backgroundColor: green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Catatan: akurasi kompas dipengaruhi sensor perangkat, '
-            'kalibrasi, dan gangguan medan magnet. Pastikan perangkat '
-            'dikalibrasi dan arah yang ditampilkan sudah diperiksa.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.black54),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: lightGreen,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, color: green),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Akurasi kompas dipengaruhi sensor perangkat dan gangguan medan magnet. Kalibrasikan perangkat dan hindari benda logam di sekitarnya.',
+                    style: TextStyle(
+                      color: Color(0xFF456457),
+                      height: 1.4,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+class _KaabaMarker extends StatelessWidget {
+  const _KaabaMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFF176B50), width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 7,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: CustomPaint(painter: _KaabaPainter()),
+    );
+  }
+}
+
+class _KaabaPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final black = Paint()..color = const Color(0xFF202522);
+    final gold = Paint()..color = const Color(0xFFD9B64C);
+    final white = Paint()..color = Colors.white;
+    final body = Path()
+      ..moveTo(w * .16, h * .27)
+      ..lineTo(w * .72, h * .16)
+      ..lineTo(w * .88, h * .29)
+      ..lineTo(w * .88, h * .78)
+      ..lineTo(w * .34, h * .90)
+      ..lineTo(w * .16, h * .76)
+      ..close();
+    canvas.drawPath(body, black);
+    final band = Path()
+      ..moveTo(w * .16, h * .36)
+      ..lineTo(w * .72, h * .25)
+      ..lineTo(w * .88, h * .37)
+      ..lineTo(w * .88, h * .45)
+      ..lineTo(w * .34, h * .56)
+      ..lineTo(w * .16, h * .46)
+      ..close();
+    canvas.drawPath(band, gold);
+    canvas.drawLine(
+      Offset(w * .34, h * .56),
+      Offset(w * .34, h * .90),
+      white..strokeWidth = 0.8,
+    );
+    canvas.drawLine(
+      Offset(w * .34, h * .56),
+      Offset(w * .88, h * .45),
+      gold..strokeWidth = 0.8,
+    );
+    final door = Path()
+      ..moveTo(w * .48, h * .57)
+      ..lineTo(w * .63, h * .54)
+      ..lineTo(w * .63, h * .80)
+      ..lineTo(w * .48, h * .84)
+      ..close();
+    canvas.drawPath(door, gold);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _CompassNeedlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final top = Path()
+      ..moveTo(cx, 0)
+      ..lineTo(cx - 23, size.height / 2)
+      ..lineTo(cx + 23, size.height / 2)
+      ..close();
+    final bottom = Path()
+      ..moveTo(cx - 23, size.height / 2)
+      ..lineTo(cx, size.height)
+      ..lineTo(cx + 23, size.height / 2)
+      ..close();
+    canvas.drawPath(top, Paint()..color = const Color(0xFF176B50));
+    canvas.drawPath(bottom, Paint()..color = const Color(0xFFB7D9C8));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
