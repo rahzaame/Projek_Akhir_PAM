@@ -495,88 +495,81 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
 
           // Notifikasi muncul hanya ketika arah sudah mendekati
           // hasil perhitungan kiblat dalam toleransi ±5 derajat.
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: qiblaFound
-                ? Container(
-                    key: const ValueKey('qibla-found'),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE1F2E8),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF8BC5A8)),
-                    ),
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.check_circle_rounded,
-                          color: _green,
-                          size: 30,
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Arah Kiblat Ditemukan!',
-                                style: TextStyle(
-                                  color: _green,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              SizedBox(height: 5),
-                              Text(
-                                'Perangkat sudah mengarah mendekati '
-                                'arah kiblat. Pertahankan posisi ini.',
-                                style: TextStyle(
-                                  color: Color(0xFF456457),
-                                  height: 1.4,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Container(
-                    key: const ValueKey('qibla-not-found'),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE1E8E3)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.screen_rotation_alt_rounded,
-                          color: _green,
-                          size: 25,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            heading == null || qibla == null
-                                ? 'Menunggu data lokasi dan sensor kompas...'
-                                : 'Belum tepat. Putar perangkat perlahan '
-                                      'sampai jarum menunjukkan arah kiblat.',
-                            style: const TextStyle(
-                              color: Color(0xFF456457),
-                              height: 1.4,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+          qiblaFound
+              ? Container(
+                  key: const ValueKey('qibla-found'),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE1F2E8),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF8BC5A8)),
                   ),
-          ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: _green, size: 30),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Arah Kiblat Ditemukan!',
+                              style: TextStyle(
+                                color: _green,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            Text(
+                              'Perangkat sudah mengarah mendekati '
+                              'arah kiblat. Pertahankan posisi ini.',
+                              style: TextStyle(
+                                color: Color(0xFF456457),
+                                height: 1.4,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Container(
+                  key: const ValueKey('qibla-not-found'),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE1E8E3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.screen_rotation_alt_rounded,
+                        color: _green,
+                        size: 25,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          heading == null || qibla == null
+                              ? 'Menunggu data lokasi dan sensor kompas...'
+                              : 'Belum tepat. Putar perangkat perlahan '
+                                    'sampai jarum menunjukkan arah kiblat.',
+                          style: const TextStyle(
+                            color: Color(0xFF456457),
+                            height: 1.4,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
           const SizedBox(height: 12),
 
