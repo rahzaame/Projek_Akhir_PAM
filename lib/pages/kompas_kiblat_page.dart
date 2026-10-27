@@ -278,6 +278,10 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
     final qibla = _qiblaBearing;
     final heading = _heading;
 
+    // Piringan kompas berputar berlawanan arah dengan heading perangkat,
+    // sehingga arah yang sedang dihadap selalu berada di atas.
+    final dialAngle = heading != null ? -heading * math.pi / 180 : 0.0;
+
     final relativeAngle = qibla != null && heading != null
         ? (qibla - heading) * math.pi / 180
         : 0.0;
@@ -361,50 +365,90 @@ class _KompasKiblatPageState extends State<KompasKiblatPage> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Container(
-                    width: 292,
-                    height: 292,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _green, width: 4),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x14233D30),
-                          blurRadius: 14,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
+                  // Piringan kompas (lingkaran + skala + huruf) ikut berputar.
+                  Transform.rotate(
+                    angle: dialAngle,
+                    child: SizedBox(
+                      width: 310,
+                      height: 310,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 292,
+                            height: 292,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: _green, width: 4),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x14233D30),
+                                  blurRadius: 14,
+                                  offset: Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Tanda skala kompas.
+                          ...List.generate(36, (index) {
+                            final isMajor = index % 9 == 0;
+
+                            return Transform.rotate(
+                              angle: index * 10 * math.pi / 180,
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: Container(
+                                  margin: const EdgeInsets.only(top: 14),
+                                  width: isMajor ? 3 : 1.5,
+                                  height: isMajor ? 17 : 8,
+                                  decoration: BoxDecoration(
+                                    color: isMajor
+                                        ? _green
+                                        : const Color(0xFFB7D9C8),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+
+                          // Huruf arah diberi latar putih agar
+                          // tidak bertumpuk dengan tanda skala.
+                          // Diputar balik agar huruf tetap tegak terbaca.
+                          Positioned(
+                            top: 17,
+                            child: Transform.rotate(
+                              angle: -dialAngle,
+                              child: _directionLabel('U', 20),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 17,
+                            child: Transform.rotate(
+                              angle: -dialAngle,
+                              child: _directionLabel('S', 18),
+                            ),
+                          ),
+                          Positioned(
+                            left: 17,
+                            child: Transform.rotate(
+                              angle: -dialAngle,
+                              child: _directionLabel('B', 18),
+                            ),
+                          ),
+                          Positioned(
+                            right: 17,
+                            child: Transform.rotate(
+                              angle: -dialAngle,
+                              child: _directionLabel('T', 18),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-
-                  // Tanda skala kompas.
-                  ...List.generate(36, (index) {
-                    final isMajor = index % 9 == 0;
-
-                    return Transform.rotate(
-                      angle: index * 10 * math.pi / 180,
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: Container(
-                          margin: const EdgeInsets.only(top: 14),
-                          width: isMajor ? 3 : 1.5,
-                          height: isMajor ? 17 : 8,
-                          decoration: BoxDecoration(
-                            color: isMajor ? _green : const Color(0xFFB7D9C8),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-
-                  // Huruf arah diberi latar putih agar
-                  // tidak bertumpuk dengan tanda skala.
-                  Positioned(top: 17, child: _directionLabel('U', 20)),
-                  Positioned(bottom: 17, child: _directionLabel('S', 18)),
-                  Positioned(left: 17, child: _directionLabel('B', 18)),
-                  Positioned(right: 17, child: _directionLabel('T', 18)),
 
                   if (qibla != null)
                     Transform.rotate(
