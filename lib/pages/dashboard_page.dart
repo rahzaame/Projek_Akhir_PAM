@@ -23,7 +23,6 @@ import 'tips_perjalanan_page.dart';
 import 'tanya_safarmate_ai_page.dart';
 import 'peta_lokasi_page.dart';
 import 'kompas_kiblat_page.dart';
-import 'sensor_perangkat_page.dart';
 import 'my_schedule.dart';
 import 'konversi_mata_uang.dart';
 import 'zona_waktu.dart';
@@ -867,16 +866,6 @@ class _DashboardPageState extends State<DashboardPage> {
             Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const KompasKiblatPage()));
-          },
-        ),
-        _featureTile(
-          Icons.screen_rotation_outlined,
-          'Sensor Perangkat',
-          'Fitur orientasi dan accelerometer',
-          () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SensorPerangkatPage()),
-            );
           },
         ),
       ],
