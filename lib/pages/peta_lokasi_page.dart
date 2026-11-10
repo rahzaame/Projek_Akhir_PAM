@@ -30,6 +30,11 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
   bool _loadingLocation = false;
   bool _searching = false;
   bool _mapReady = false;
+  bool _loadingRoute = false;
+  List<LatLng> _routePoints = [];
+  double? _routeDistanceKm;
+  double? _routeDurationMinutes;
+  String? _routeDestinationName;
 
   static const LatLng _makkahCenter = LatLng(21.4225, 39.8262);
   static const LatLng _madinahCenter = LatLng(24.4672, 39.6111);
@@ -158,6 +163,40 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
     setState(() => _savedIds = updated);
   }
 
+  Future<List<dynamic>> _requestNominatim(
+    String query,
+    String countryCode,
+  ) async {
+    final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+      'q': query,
+      'format': 'jsonv2',
+      'limit': '10',
+      'addressdetails': '1',
+      'accept-language': 'id,en',
+      'countrycodes': countryCode,
+      'dedupe': '1',
+    });
+
+    final response = await http
+        .get(
+          uri,
+          headers: const {
+            'User-Agent': 'SafarMateFlutterApp/1.0 (location search feature)',
+          },
+        )
+        .timeout(const Duration(seconds: 20));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Layanan pencarian memberi status ${response.statusCode}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return [];
+    return decoded;
+  }
+
   Future<void> _searchPlaces() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) {
@@ -172,49 +211,49 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
       _selectedSearchResult = null;
     });
 
-    final country = _selectedCity == 'Turki' ? 'Turkey' : 'Saudi Arabia';
-    final city = _selectedCity == 'Turki' ? 'Istanbul' : _selectedCity;
+    final isTurkey = _selectedCity == 'Turki';
+    final country = isTurkey ? 'Turkey' : 'Saudi Arabia';
+    final countryCode = isTurkey ? 'tr' : 'sa';
+    final city = isTurkey
+        ? 'Istanbul'
+        : (_selectedCity == 'Makkah' ? 'Mecca' : 'Medina');
 
     try {
-      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
-        'q': '$query, $city, $country',
-        'format': 'jsonv2',
-        'limit': '6',
-        'addressdetails': '1',
-        'accept-language': 'id,en',
-        'countrycodes': _selectedCity == 'Turki' ? 'tr' : 'sa',
-      });
-
-      final response = await http.get(
-        uri,
-        headers: const {
-          'User-Agent': 'SafarMateFlutterApp/1.0 (location search feature)',
-        },
+      // Percobaan pertama: nama lokasi + kota + negara.
+      var data = await _requestNominatim(
+        '$query, $city, $country',
+        countryCode,
       );
 
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Layanan pencarian memberi status ${response.statusCode}',
-        );
+      // Jika belum ditemukan, longgarkan pencarian dengan menghapus nama kota.
+      if (data.isEmpty) {
+        await Future.delayed(const Duration(milliseconds: 1100));
+        data = await _requestNominatim('$query, $country', countryCode);
       }
 
-      final data = jsonDecode(response.body) as List<dynamic>;
+      // Terjemahan nama kota dan batas pencarian tetap dipertahankan.
       final results = <_Destination>[];
+      final seenIds = <String>{};
 
-      for (final item in data) {
-        if (item is! Map<String, dynamic>) continue;
+      for (final rawItem in data) {
+        if (rawItem is! Map) continue;
+        final item = Map<String, dynamic>.from(rawItem);
         final lat = double.tryParse(item['lat']?.toString() ?? '');
         final lon = double.tryParse(item['lon']?.toString() ?? '');
         final displayName = item['display_name']?.toString();
 
         if (lat == null || lon == null || displayName == null) continue;
 
-        final name = item['name']?.toString().trim().isNotEmpty == true
-            ? item['name'].toString()
-            : displayName.split(',').first;
+        final rawName = item['name']?.toString().trim() ?? '';
+        final name = rawName.isNotEmpty
+            ? rawName
+            : displayName.split(',').first.trim();
 
-        final id =
-            'search_${item['osm_type'] ?? 'place'}_${item['osm_id'] ?? item['place_id']}';
+        final osmId = item['osm_id'] ?? item['place_id'];
+        final osmType = item['osm_type'] ?? 'place';
+        final id = 'search_${osmType}_$osmId';
+
+        if (!seenIds.add(id)) continue;
 
         results.add(
           _Destination(
@@ -231,7 +270,9 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
       setState(() => _searchResults = results);
 
       if (results.isEmpty) {
-        _showMessage('Lokasi tidak ditemukan di wilayah $_selectedCity.');
+        _showMessage(
+          'Lokasi belum ditemukan. Coba gunakan nama tempat yang lebih umum atau tambahkan nama kota.',
+        );
       }
     } catch (e) {
       debugPrint('Pencarian lokasi gagal: $e');
@@ -245,6 +286,10 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
     setState(() {
       _selectedSearchResult = destination;
       _showSavedOnly = false;
+      _routePoints = [];
+      _routeDistanceKm = null;
+      _routeDurationMinutes = null;
+      _routeDestinationName = null;
     });
     if (_mapReady) _mapController.move(destination.location, 16);
   }
@@ -275,37 +320,15 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
     setState(() => _loadingLocation = true);
 
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showMessage('Aktifkan layanan lokasi/GPS perangkat terlebih dahulu.');
-        return;
-      }
-
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied) {
-        _showMessage('Izin lokasi belum diberikan.');
-        return;
-      }
-      if (permission == LocationPermission.deniedForever) {
-        _showMessage(
-          'Izin lokasi ditolak permanen. Aktifkan dari Pengaturan aplikasi.',
-        );
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 20),
-        ),
-      );
-
-      if (!mounted) return;
-      setState(() => _currentPosition = position);
+      final position = await _getUserPosition();
+      if (position == null || !mounted) return;
+      setState(() {
+        _currentPosition = position;
+        _routePoints = [];
+        _routeDistanceKm = null;
+        _routeDurationMinutes = null;
+        _routeDestinationName = null;
+      });
 
       if (_mapReady) {
         _mapController.move(LatLng(position.latitude, position.longitude), 15);
@@ -340,6 +363,119 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
     if (_mapReady) _mapController.move(_selectedCenter, 12);
   }
 
+  Future<Position?> _getUserPosition() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showMessage('Aktifkan layanan lokasi/GPS perangkat terlebih dahulu.');
+      return null;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      _showMessage('Izin lokasi belum diberikan.');
+      return null;
+    }
+    if (permission == LocationPermission.deniedForever) {
+      _showMessage(
+        'Izin lokasi ditolak permanen. Aktifkan dari Pengaturan aplikasi.',
+      );
+      return null;
+    }
+
+    return Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 20),
+      ),
+    );
+  }
+
+  Future<void> _showRoute(_Destination destination) async {
+    if (_loadingRoute) return;
+    setState(() => _loadingRoute = true);
+
+    try {
+      final position = await _getUserPosition();
+      if (position == null || !mounted) return;
+
+      final origin = LatLng(position.latitude, position.longitude);
+      final target = destination.location;
+
+      // OSRM menghitung rute kendaraan melalui jaringan jalan.
+      final coordinates =
+          '${origin.longitude},${origin.latitude};${target.longitude},${target.latitude}';
+      final uri = Uri.parse(
+        'https://router.project-osrm.org/route/v1/driving/$coordinates'
+        '?overview=full&geometries=geojson&steps=false',
+      );
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200) {
+        throw Exception('Layanan rute memberi status ${response.statusCode}');
+      }
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final routes = body['routes'] as List<dynamic>? ?? [];
+      if (routes.isEmpty) {
+        _showMessage('Rute untuk lokasi ini belum tersedia.');
+        return;
+      }
+
+      final route = routes.first as Map<String, dynamic>;
+      final geometry = route['geometry'] as Map<String, dynamic>;
+      final coordinatesList = geometry['coordinates'] as List<dynamic>;
+      final points = coordinatesList.map((coordinate) {
+        final pair = coordinate as List<dynamic>;
+        return LatLng((pair[1] as num).toDouble(), (pair[0] as num).toDouble());
+      }).toList();
+
+      final distanceMeters = (route['distance'] as num).toDouble();
+      final durationSeconds = (route['duration'] as num).toDouble();
+
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = position;
+        _routePoints = points;
+        _routeDistanceKm = distanceMeters / 1000;
+        _routeDurationMinutes = durationSeconds / 60;
+        _routeDestinationName = destination.name;
+      });
+
+      if (_mapReady && points.isNotEmpty) {
+        final bounds = LatLngBounds.fromPoints(points);
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: bounds,
+            padding: const EdgeInsets.fromLTRB(55, 90, 55, 90),
+          ),
+        );
+      }
+
+      if (mounted) Navigator.of(context).maybePop();
+    } catch (e) {
+      debugPrint('Gagal memuat rute: $e');
+      _showMessage(
+        'Rute belum berhasil dimuat. Periksa koneksi internet lalu coba lagi.',
+      );
+    } finally {
+      if (mounted) setState(() => _loadingRoute = false);
+    }
+  }
+
+  void _clearRoute() {
+    setState(() {
+      _routePoints = [];
+      _routeDistanceKm = null;
+      _routeDurationMinutes = null;
+      _routeDestinationName = null;
+    });
+  }
+
   void _showDestination(_Destination destination) {
     showModalBottomSheet<void>(
       context: context,
@@ -367,6 +503,34 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
               const SizedBox(height: 12),
               Text(destination.description),
               const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _loadingRoute
+                      ? null
+                      : () => _showRoute(destination),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: safarGreen,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  icon: _loadingRoute
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.directions),
+                  label: Text(
+                    _loadingRoute
+                        ? 'Memuat rute...'
+                        : 'Lihat rute dari lokasiku',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -723,6 +887,16 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.projek_akhir_pam',
                     ),
+                    if (_routePoints.length >= 2)
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: _routePoints,
+                            strokeWidth: 5,
+                            color: Colors.blue,
+                          ),
+                        ],
+                      ),
                     MarkerLayer(markers: markers),
                     RichAttributionWidget(
                       attributions: [
@@ -734,6 +908,51 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                     ),
                   ],
                 ),
+                if (_routeDistanceKm != null && _routeDurationMinutes != null)
+                  Positioned(
+                    left: 12,
+                    top: 12,
+                    right: 76,
+                    child: Card(
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.directions, color: safarGreen),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _routeDestinationName ?? 'Rute perjalanan',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${_routeDistanceKm!.toStringAsFixed(1)} km • '
+                                    '${_routeDurationMinutes! < 60 ? '${_routeDurationMinutes!.round()} menit' : '${(_routeDurationMinutes! / 60).floor()} jam ${(_routeDurationMinutes! % 60).round()} menit'}',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Tutup rute',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _clearRoute,
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 Positioned(
                   right: 16,
                   top: 16,
