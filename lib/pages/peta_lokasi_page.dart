@@ -12,35 +12,6 @@ import 'package:url_launcher/url_launcher.dart';
 const Color safarGreen = Color(0xFF176B50);
 const Color safarLightGreen = Color(0xFFE1F2E8);
 
-/// Moda perjalanan. Setiap moda memakai layanan rute OSM yang berbeda
-/// (mobil, pejalan kaki, sepeda) agar hasil rutenya sesuai jenis jalannya.
-enum _TravelMode {
-  driving('Mobil', Icons.directions_car, 'routed-car', 'driving'),
-  walking('Jalan kaki', Icons.directions_walk, 'routed-foot', 'walking'),
-  cycling('Sepeda', Icons.directions_bike, 'routed-bike', 'bicycling');
-
-  final String label;
-  final IconData icon;
-  final String osrmService;
-  final String googleMode;
-
-  const _TravelMode(this.label, this.icon, this.osrmService, this.googleMode);
-}
-
-class _RouteStep {
-  final String instruction;
-  final IconData icon;
-  final double distanceMeters;
-  final LatLng? location;
-
-  const _RouteStep({
-    required this.instruction,
-    required this.icon,
-    required this.distanceMeters,
-    this.location,
-  });
-}
-
 class PetaLokasiPage extends StatefulWidget {
   const PetaLokasiPage({super.key});
 
@@ -62,25 +33,6 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
   bool _searching = false;
   bool _mapReady = false;
 
-  // --- State rute ---
-  bool _loadingRoute = false;
-  bool _showSteps = false;
-  bool _followMe = false;
-  _TravelMode _travelMode = _TravelMode.driving;
-  _Destination? _routeDestination;
-  List<LatLng> _routePoints = [];
-  List<_RouteStep> _routeSteps = [];
-  double? _routeDistanceKm;
-  double? _routeDurationMinutes;
-  int _routeToken = 0;
-  StreamSubscription<Position>? _positionSub;
-
-  bool get _hasRoute =>
-      _routePoints.length >= 2 &&
-      _routeDistanceKm != null &&
-      _routeDurationMinutes != null &&
-      _routeDestination != null;
-
   static const LatLng _makkahCenter = LatLng(21.4225, 39.8262);
   static const LatLng _madinahCenter = LatLng(24.4672, 39.6111);
   static const LatLng _turkeyCenter = LatLng(41.0082, 28.9784);
@@ -88,7 +40,7 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
   static const String _savedKey = 'safarmate_saved_destinations';
   static const String _customKey = 'safarmate_custom_destinations';
   static const String _userAgent =
-      'SafarMateFlutterApp/1.0 (location search and routing feature)';
+      'SafarMateFlutterApp/1.0 (location search feature)';
 
   final List<_Destination> _destinations = const [
     _Destination(
@@ -159,7 +111,6 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
 
   @override
   void dispose() {
-    _positionSub?.cancel();
     _mapController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -364,7 +315,6 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
   }
 
   void _selectSearchResult(_Destination destination) {
-    _resetRoute();
     setState(() {
       _selectedSearchResult = destination;
       _showSavedOnly = false;
@@ -456,304 +406,18 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
     }
   }
 
-  /// Memperbarui posisi pengguna secara langsung selama rute aktif.
-  void _startTracking() {
-    _positionSub?.cancel();
-    _positionSub =
-        Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 10,
-          ),
-        ).listen((position) {
-          if (!mounted) return;
-          setState(() => _currentPosition = position);
-          if (_followMe && _mapReady) {
-            _mapController.move(
-              LatLng(position.latitude, position.longitude),
-              _mapController.camera.zoom,
-            );
-          }
-        }, onError: (Object e) => debugPrint('Pelacakan lokasi gagal: $e'));
-  }
-
-  void _stopTracking() {
-    _positionSub?.cancel();
-    _positionSub = null;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Rute
-  // ---------------------------------------------------------------------------
-
-  void _resetRoute() {
-    _routeToken++;
-    _stopTracking();
-    setState(() {
-      _routeDestination = null;
-      _routePoints = [];
-      _routeSteps = [];
-      _routeDistanceKm = null;
-      _routeDurationMinutes = null;
-      _showSteps = false;
-      _followMe = false;
-      _loadingRoute = false;
-    });
-  }
-
-  Future<void> _showRoute(
-    _Destination destination, {
-    _TravelMode? mode,
-    bool reuseLocation = false,
-  }) async {
-    if (_loadingRoute) return;
-    final travelMode = mode ?? _travelMode;
-    final token = ++_routeToken;
-
-    setState(() => _loadingRoute = true);
-
-    try {
-      final position = (reuseLocation && _currentPosition != null)
-          ? _currentPosition
-          : await _getUserPosition();
-      if (position == null || !mounted || token != _routeToken) return;
-
-      final origin = LatLng(position.latitude, position.longitude);
-      final target = destination.location;
-
-      final coordinates =
-          '${origin.longitude},${origin.latitude};${target.longitude},${target.latitude}';
-      final uri = Uri.parse(
-        'https://routing.openstreetmap.de/${travelMode.osrmService}/route/v1/driving/$coordinates'
-        '?overview=full&geometries=geojson&steps=true',
-      );
-
-      final response = await http
-          .get(uri, headers: const {'User-Agent': _userAgent})
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode != 200) {
-        throw Exception('Layanan rute memberi status ${response.statusCode}');
-      }
-
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final routes = body['routes'] as List<dynamic>? ?? [];
-      if (body['code'] != 'Ok' || routes.isEmpty) {
-        _showMessage(
-          'Rute ${travelMode.label.toLowerCase()} ke lokasi ini belum tersedia.',
-        );
-        return;
-      }
-
-      final route = routes.first as Map<String, dynamic>;
-      final geometry = route['geometry'] as Map<String, dynamic>;
-      final coordinatesList = geometry['coordinates'] as List<dynamic>;
-      final points = coordinatesList.map((coordinate) {
-        final pair = coordinate as List<dynamic>;
-        return LatLng((pair[1] as num).toDouble(), (pair[0] as num).toDouble());
-      }).toList();
-
-      final steps = <_RouteStep>[];
-      for (final leg in (route['legs'] as List<dynamic>? ?? [])) {
-        for (final rawStep in ((leg as Map)['steps'] as List<dynamic>? ?? [])) {
-          steps.add(_stepFromJson(Map<String, dynamic>.from(rawStep as Map)));
-        }
-      }
-
-      final distanceMeters = (route['distance'] as num).toDouble();
-      final durationSeconds = (route['duration'] as num).toDouble();
-
-      if (!mounted || token != _routeToken) return;
-      setState(() {
-        _currentPosition = position;
-        _travelMode = travelMode;
-        _routeDestination = destination;
-        _routePoints = points;
-        _routeSteps = steps;
-        _routeDistanceKm = distanceMeters / 1000;
-        _routeDurationMinutes = durationSeconds / 60;
-        _showSteps = false;
-      });
-
-      _startTracking();
-
-      if (_mapReady && points.isNotEmpty) {
-        _mapController.fitCamera(
-          CameraFit.bounds(
-            bounds: LatLngBounds.fromPoints(points),
-            padding: const EdgeInsets.fromLTRB(50, 80, 50, 270),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Gagal memuat rute: $e');
-      if (token == _routeToken) {
-        _showMessage(
-          'Rute belum berhasil dimuat. Periksa koneksi internet lalu coba lagi.',
-        );
-      }
-    } finally {
-      if (mounted && token == _routeToken) {
-        setState(() => _loadingRoute = false);
-      }
-    }
-  }
-
-  void _changeTravelMode(_TravelMode mode) {
-    final destination = _routeDestination;
-    if (destination == null || mode == _travelMode) return;
-    _showRoute(destination, mode: mode, reuseLocation: true);
-  }
-
-  // --- Terjemahan langkah belokan OSRM ke bahasa Indonesia ---
-
-  String _modifierLabel(String modifier) {
-    switch (modifier) {
-      case 'left':
-        return 'kiri';
-      case 'right':
-        return 'kanan';
-      case 'slight left':
-        return 'serong kiri';
-      case 'slight right':
-        return 'serong kanan';
-      case 'sharp left':
-        return 'tajam ke kiri';
-      case 'sharp right':
-        return 'tajam ke kanan';
-      case 'straight':
-        return 'lurus';
-      default:
-        return '';
-    }
-  }
-
-  IconData _iconFor(String type, String modifier) {
-    if (type == 'depart') return Icons.navigation;
-    if (type == 'arrive') return Icons.flag;
-    if (type == 'roundabout' || type == 'rotary' || type == 'roundabout turn') {
-      return Icons.roundabout_left;
-    }
-    switch (modifier) {
-      case 'left':
-      case 'sharp left':
-        return Icons.turn_left;
-      case 'right':
-      case 'sharp right':
-        return Icons.turn_right;
-      case 'slight left':
-        return Icons.turn_slight_left;
-      case 'slight right':
-        return Icons.turn_slight_right;
-      case 'uturn':
-        return Icons.u_turn_left;
-      default:
-        return Icons.straight;
-    }
-  }
-
-  _RouteStep _stepFromJson(Map<String, dynamic> step) {
-    final maneuver = step['maneuver'] is Map
-        ? Map<String, dynamic>.from(step['maneuver'] as Map)
-        : <String, dynamic>{};
-    final type = maneuver['type']?.toString() ?? '';
-    final modifier = maneuver['modifier']?.toString() ?? '';
-    final name = (step['name']?.toString() ?? '').trim();
-    final dir = _modifierLabel(modifier);
-    final onRoad = name.isEmpty ? '' : ' ke $name';
-
-    String text;
-    switch (type) {
-      case 'depart':
-        text = name.isEmpty ? 'Mulai perjalanan' : 'Mulai perjalanan di $name';
-        break;
-      case 'arrive':
-        text = (modifier == 'left' || modifier == 'right')
-            ? 'Anda tiba di tujuan (di sisi $dir)'
-            : 'Anda tiba di tujuan';
-        break;
-      case 'roundabout':
-      case 'rotary':
-      case 'roundabout turn':
-        final exit = maneuver['exit'];
-        text = exit != null
-            ? 'Masuk bundaran, ambil jalan keluar ke-$exit$onRoad'
-            : 'Masuk bundaran$onRoad';
-        break;
-      case 'fork':
-        text = dir.isEmpty
-            ? 'Ambil percabangan$onRoad'
-            : 'Ambil percabangan $dir$onRoad';
-        break;
-      case 'merge':
-        text = 'Gabung ke jalur$onRoad'.replaceFirst('jalur ke', 'jalur');
-        break;
-      case 'continue':
-      case 'new name':
-        text = name.isEmpty ? 'Lanjutkan lurus' : 'Lanjutkan di $name';
-        break;
-      default:
-        if (modifier == 'uturn') {
-          text = 'Putar balik';
-        } else if (modifier == 'straight' || dir.isEmpty) {
-          text = 'Lanjutkan lurus$onRoad';
-        } else {
-          text = 'Belok $dir$onRoad';
-        }
-    }
-
-    final loc = maneuver['location'];
-    LatLng? location;
-    if (loc is List && loc.length >= 2) {
-      location = LatLng((loc[1] as num).toDouble(), (loc[0] as num).toDouble());
-    }
-
-    return _RouteStep(
-      instruction: text,
-      icon: _iconFor(type, modifier),
-      distanceMeters: (step['distance'] as num?)?.toDouble() ?? 0,
-      location: location,
-    );
-  }
-
-  // --- Format ---
-
-  String _formatDistance(double meters) {
-    if (meters < 1000) return '${meters.round()} m';
-    return '${(meters / 1000).toStringAsFixed(1)} km';
-  }
-
-  String _formatDuration(double minutes) {
-    final total = minutes.round();
-    if (total < 1) return '< 1 menit';
-    if (total < 60) return '$total menit';
-    final h = total ~/ 60;
-    final m = total % 60;
-    return m == 0 ? '$h jam' : '$h jam $m menit';
-  }
-
-  String _formatEta(double minutes) {
-    final t = DateTime.now().add(Duration(minutes: minutes.round()));
-    final hh = t.hour.toString().padLeft(2, '0');
-    final mm = t.minute.toString().padLeft(2, '0');
-    return '$hh.$mm';
-  }
-
   // ---------------------------------------------------------------------------
   // Google Maps
   // ---------------------------------------------------------------------------
 
-  /// Membuka Google Maps. Tanpa `origin`, Google Maps otomatis memakai lokasi
-  /// pengguna saat ini, sehingga tombol ini juga berfungsi tanpa GPS di aplikasi.
-  Future<void> _openGoogleMaps(
-    _Destination destination, {
-    _TravelMode? mode,
-  }) async {
+  /// Membuka rute di Google Maps. Titik awal sengaja tidak dikirim, sehingga
+  /// Google Maps otomatis memakai lokasi pengguna saat itu. Moda perjalanan
+  /// (mobil, jalan kaki, dll.) bisa diganti langsung di Google Maps.
+  Future<void> _openGoogleMaps(_Destination destination) async {
     final uri = Uri.https('www.google.com', '/maps/dir/', {
       'api': '1',
       'destination':
           '${destination.location.latitude},${destination.location.longitude}',
-      'travelmode': (mode ?? _travelMode).googleMode,
     });
 
     try {
@@ -803,31 +467,14 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                 child: FilledButton.icon(
                   onPressed: () {
                     Navigator.pop(sheetContext);
-                    _showRoute(destination);
+                    _openGoogleMaps(destination);
                   },
                   style: FilledButton.styleFrom(
                     backgroundColor: safarGreen,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                   ),
                   icon: const Icon(Icons.directions),
-                  label: const Text('Lihat rute dari lokasiku'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(sheetContext);
-                    _openGoogleMaps(destination);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: safarGreen,
-                    side: const BorderSide(color: safarGreen),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                  icon: const Icon(Icons.map_outlined),
-                  label: const Text('Buka di Google Maps'),
+                  label: const Text('Buka rute di Google Maps'),
                 ),
               ),
               const SizedBox(height: 12),
@@ -942,14 +589,6 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
             ),
           ),
         ),
-      if (_hasRoute)
-        Marker(
-          point: _routeDestination!.location,
-          width: 44,
-          height: 44,
-          alignment: Alignment.topCenter,
-          child: const Icon(Icons.flag_circle, color: Colors.red, size: 40),
-        ),
       if (_currentPosition != null)
         Marker(
           point: LatLng(
@@ -1002,7 +641,6 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                         ],
                         onChanged: (value) {
                           if (value == null) return;
-                          _resetRoute();
                           setState(() {
                             _selectedCity = value;
                             _showSavedOnly = false;
@@ -1015,22 +653,6 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                           });
                         },
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    IconButton.filled(
-                      tooltip: 'Tampilkan lokasiku',
-                      onPressed: _loadingLocation ? null : _showCurrentLocation,
-                      style: IconButton.styleFrom(backgroundColor: safarGreen),
-                      icon: _loadingLocation
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.my_location),
                     ),
                   ],
                 ),
@@ -1168,24 +790,9 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.projek_akhir_pam',
                     ),
-                    if (_routePoints.length >= 2)
-                      PolylineLayer(
-                        polylines: [
-                          // Garis putih di bawah sebagai bingkai rute.
-                          Polyline(
-                            points: _routePoints,
-                            strokeWidth: 9,
-                            color: Colors.white,
-                          ),
-                          Polyline(
-                            points: _routePoints,
-                            strokeWidth: 5,
-                            color: const Color(0xFF1A73E8),
-                          ),
-                        ],
-                      ),
                     MarkerLayer(markers: markers),
                     RichAttributionWidget(
+                      alignment: AttributionAlignment.bottomLeft,
                       attributions: [
                         TextSourceAttribution(
                           '© OpenStreetMap contributors',
@@ -1195,32 +802,6 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                     ),
                   ],
                 ),
-                if (_loadingRoute && !_hasRoute)
-                  Positioned(
-                    left: 12,
-                    right: 76,
-                    top: 12,
-                    child: Card(
-                      elevation: 4,
-                      child: const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: safarGreen,
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Expanded(child: Text('Memuat rute...')),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
                 Positioned(
                   right: 16,
                   top: 16,
@@ -1245,35 +826,28 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                         },
                         child: const Icon(Icons.remove),
                       ),
-                      if (_hasRoute) ...[
-                        const SizedBox(height: 8),
-                        FloatingActionButton.small(
-                          heroTag: 'follow_me_map',
-                          tooltip: _followMe
-                              ? 'Berhenti mengikuti lokasi'
-                              : 'Ikuti lokasiku',
-                          backgroundColor: _followMe
-                              ? safarGreen
-                              : Colors.white,
-                          foregroundColor: _followMe
-                              ? Colors.white
-                              : safarGreen,
-                          onPressed: () {
-                            setState(() => _followMe = !_followMe);
-                            final p = _currentPosition;
-                            if (_followMe && p != null && _mapReady) {
-                              _mapController.move(
-                                LatLng(p.latitude, p.longitude),
-                                16,
-                              );
-                            }
-                          },
-                          child: Icon(
-                            _followMe ? Icons.gps_fixed : Icons.gps_not_fixed,
-                          ),
-                        ),
-                      ],
                     ],
+                  ),
+                ),
+                Positioned(
+                  right: 16,
+                  bottom: 24,
+                  child: FloatingActionButton(
+                    heroTag: 'my_location_map',
+                    tooltip: 'Tampilkan lokasiku',
+                    backgroundColor: Colors.white,
+                    foregroundColor: safarGreen,
+                    onPressed: _loadingLocation ? null : _showCurrentLocation,
+                    child: _loadingLocation
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: safarGreen,
+                            ),
+                          )
+                        : const Icon(Icons.my_location),
                   ),
                 ),
                 if (_showSavedOnly && visibleDestinations.isEmpty)
@@ -1291,13 +865,6 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                       ),
                     ),
                   ),
-                if (_hasRoute)
-                  Positioned(
-                    left: 12,
-                    right: 12,
-                    bottom: 12,
-                    child: _buildRoutePanel(),
-                  ),
               ],
             ),
           ),
@@ -1306,174 +873,9 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             color: Colors.white,
             child: const Text(
-              'Pilih penanda pada peta untuk melihat informasi, rute, dan menyimpan destinasi. Data peta © OpenStreetMap contributors.',
+              'Pilih penanda pada peta untuk melihat informasi, membuka rute di Google Maps, dan menyimpan destinasi. Data peta © OpenStreetMap contributors.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRoutePanel() {
-    final destination = _routeDestination!;
-    final minutes = _routeDurationMinutes!;
-    final km = _routeDistanceKm!;
-
-    return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_loadingRoute)
-            const LinearProgressIndicator(minHeight: 3, color: safarGreen)
-          else
-            const SizedBox(height: 3),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 6, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ke ${destination.name}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Text(
-                            _formatDuration(minutes),
-                            style: const TextStyle(
-                              color: safarGreen,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              '${_formatDistance(km * 1000)} • tiba ±${_formatEta(minutes)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Tutup rute',
-                  onPressed: _resetRoute,
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                for (final mode in _TravelMode.values)
-                  ChoiceChip(
-                    avatar: Icon(
-                      mode.icon,
-                      size: 18,
-                      color: mode == _travelMode ? safarGreen : Colors.black54,
-                    ),
-                    label: Text(mode.label),
-                    selected: mode == _travelMode,
-                    selectedColor: safarLightGreen,
-                    visualDensity: VisualDensity.compact,
-                    onSelected: _loadingRoute
-                        ? null
-                        : (_) => _changeTravelMode(mode),
-                  ),
-              ],
-            ),
-          ),
-          if (_showSteps)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 190),
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-                itemCount: _routeSteps.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final step = _routeSteps[index];
-                  return ListTile(
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                    leading: Icon(step.icon, color: safarGreen),
-                    title: Text(
-                      step.instruction,
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    trailing: step.distanceMeters > 0
-                        ? Text(
-                            _formatDistance(step.distanceMeters),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
-                            ),
-                          )
-                        : null,
-                    onTap: step.location == null || !_mapReady
-                        ? null
-                        : () => _mapController.move(step.location!, 17),
-                  );
-                },
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _routeSteps.isEmpty
-                        ? null
-                        : () => setState(() => _showSteps = !_showSteps),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: safarGreen,
-                      side: const BorderSide(color: safarGreen),
-                    ),
-                    icon: Icon(
-                      _showSteps ? Icons.expand_more : Icons.list_alt,
-                      size: 18,
-                    ),
-                    label: Text(_showSteps ? 'Sembunyikan' : 'Langkah'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: FilledButton.icon(
-                    onPressed: () => _openGoogleMaps(destination),
-                    style: FilledButton.styleFrom(backgroundColor: safarGreen),
-                    icon: const Icon(Icons.navigation, size: 18),
-                    label: const Text('Navigasi di Google Maps'),
-                  ),
-                ),
-              ],
             ),
           ),
         ],
