@@ -14,6 +14,7 @@ import '../services/package_service.dart';
 import 'tata_cara_umrah_page.dart';
 import 'doa_dan_dzikir_page.dart';
 import 'tips_perjalanan_page.dart';
+import 'penerjemah_suara_page.dart';
 import 'tanya_safarmate_ai_page.dart';
 import 'peta_lokasi_page.dart';
 import 'kompas_kiblat_page.dart';
@@ -485,6 +486,15 @@ class _DashboardPageState extends State<DashboardPage> {
           () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const TipsPerjalananPage()),
+          ),
+        ),
+        _featureTile(
+          Icons.translate_rounded,
+          'Penerjemah Suara',
+          'Terjemahkan percakapan Bahasa Indonesia',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PenerjemahSuaraPage()),
           ),
         ),
         _featureTile(
