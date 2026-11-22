@@ -28,6 +28,9 @@ dependencies:
   geolocator: ^14.1.2
   flutter_markdown: ^0.7.7+1
   flutter_secure_storage: ^11.2.0
+  flutter_tts: ^4.2.5
+  google_mlkit_translation: ^1.0.3
+  speech_to_text: ^7.5.0
 
 dev_dependencies:
   flutter_test:
