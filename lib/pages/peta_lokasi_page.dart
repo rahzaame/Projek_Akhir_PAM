@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const Color safarGreen = Color(0xFF176B50);
 const Color safarLightGreen = Color(0xFFE1F2E8);
@@ -40,6 +42,8 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
 
   static const String _savedKey = 'safarmate_saved_destinations';
   static const String _customKey = 'safarmate_custom_destinations';
+  static const String _userAgent =
+      'SafarMateFlutterApp/1.0 (location search feature)';
 
   final List<_Destination> _destinations = const [
     _Destination(
@@ -175,6 +179,70 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
     setState(() => _savedIds = updated);
   }
 
+  Future<void> _saveSearchResult(_Destination destination) async {
+    final existingIndex = _customDestinations.indexWhere(
+      (item) => item.id == destination.id,
+    );
+    final updated = List<_Destination>.from(_customDestinations);
+
+    if (existingIndex >= 0) {
+      updated[existingIndex] = destination;
+    } else {
+      updated.add(destination);
+    }
+
+    await _persistCustomDestinations(updated);
+    if (!mounted) return;
+
+    setState(() => _customDestinations = updated);
+    await _toggleSaved(destination);
+  }
+
+  /// Simpan / hapus simpanan untuk destinasi bawaan maupun hasil pencarian.
+  Future<void> _toggleSavedAny(_Destination destination) async {
+    final isSaved = _savedIds.contains(destination.id);
+    final isSearchResult = destination.id.startsWith('search_');
+
+    if (isSearchResult && !isSaved) {
+      await _saveSearchResult(destination);
+    } else {
+      await _toggleSaved(destination);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pencarian tempat
+  // ---------------------------------------------------------------------------
+
+  Future<List<dynamic>> _requestNominatim(
+    String query,
+    String countryCode,
+  ) async {
+    final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+      'q': query,
+      'format': 'jsonv2',
+      'limit': '10',
+      'addressdetails': '1',
+      'accept-language': 'id,en',
+      'countrycodes': countryCode,
+      'dedupe': '1',
+    });
+
+    final response = await http
+        .get(uri, headers: const {'User-Agent': _userAgent})
+        .timeout(const Duration(seconds: 20));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Layanan pencarian memberi status ${response.statusCode}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) return [];
+    return decoded;
+  }
+
   Future<void> _searchPlaces() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) {
@@ -189,49 +257,48 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
       _selectedSearchResult = null;
     });
 
-    final country = _selectedCity == 'Turki' ? 'Turkey' : 'Saudi Arabia';
-    final city = _selectedCity == 'Turki' ? 'Istanbul' : _selectedCity;
+    final isTurkey = _selectedCity == 'Turki';
+    final country = isTurkey ? 'Turkey' : 'Saudi Arabia';
+    final countryCode = isTurkey ? 'tr' : 'sa';
+    final city = isTurkey
+        ? 'Istanbul'
+        : (_selectedCity == 'Makkah' ? 'Mecca' : 'Medina');
 
     try {
-      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
-        'q': '$query, $city, $country',
-        'format': 'jsonv2',
-        'limit': '6',
-        'addressdetails': '1',
-        'accept-language': 'id,en',
-        'countrycodes': _selectedCity == 'Turki' ? 'tr' : 'sa',
-      });
-
-      final response = await http.get(
-        uri,
-        headers: const {
-          'User-Agent': 'SafarMateFlutterApp/1.0 (location search feature)',
-        },
+      // Percobaan pertama: nama lokasi + kota + negara.
+      var data = await _requestNominatim(
+        '$query, $city, $country',
+        countryCode,
       );
 
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Layanan pencarian memberi status ${response.statusCode}',
-        );
+      // Jika belum ditemukan, longgarkan pencarian dengan menghapus nama kota.
+      if (data.isEmpty) {
+        await Future.delayed(const Duration(milliseconds: 1100));
+        data = await _requestNominatim('$query, $country', countryCode);
       }
 
-      final data = jsonDecode(response.body) as List<dynamic>;
       final results = <_Destination>[];
+      final seenIds = <String>{};
 
-      for (final item in data) {
-        if (item is! Map<String, dynamic>) continue;
+      for (final rawItem in data) {
+        if (rawItem is! Map) continue;
+        final item = Map<String, dynamic>.from(rawItem);
         final lat = double.tryParse(item['lat']?.toString() ?? '');
         final lon = double.tryParse(item['lon']?.toString() ?? '');
         final displayName = item['display_name']?.toString();
 
         if (lat == null || lon == null || displayName == null) continue;
 
-        final name = item['name']?.toString().trim().isNotEmpty == true
-            ? item['name'].toString()
-            : displayName.split(',').first;
+        final rawName = item['name']?.toString().trim() ?? '';
+        final name = rawName.isNotEmpty
+            ? rawName
+            : displayName.split(',').first.trim();
 
-        final id =
-            'search_${item['osm_type'] ?? 'place'}_${item['osm_id'] ?? item['place_id']}';
+        final osmId = item['osm_id'] ?? item['place_id'];
+        final osmType = item['osm_type'] ?? 'place';
+        final id = 'search_${osmType}_$osmId';
+
+        if (!seenIds.add(id)) continue;
 
         results.add(
           _Destination(
@@ -248,7 +315,9 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
       setState(() => _searchResults = results);
 
       if (results.isEmpty) {
-        _showMessage('Lokasi tidak ditemukan di wilayah $_selectedCity.');
+        _showMessage(
+          'Lokasi belum ditemukan. Coba gunakan nama tempat yang lebih umum atau tambahkan nama kota.',
+        );
       }
     } catch (e) {
       debugPrint('Pencarian lokasi gagal: $e');
@@ -266,74 +335,9 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
     if (_mapReady) _mapController.move(destination.location, 16);
   }
 
-  Future<void> _saveSearchResult(_Destination destination) async {
-    final existingIndex = _customDestinations.indexWhere(
-      (item) => item.id == destination.id,
-    );
-    final updated = List<_Destination>.from(_customDestinations);
-
-    if (existingIndex >= 0) {
-      updated[existingIndex] = destination;
-    } else {
-      updated.add(destination);
-    }
-
-    await _persistCustomDestinations(updated);
-    if (!mounted) return;
-
-    setState(() {
-      _customDestinations = updated;
-    });
-    await _toggleSaved(destination);
-  }
-
-  Future<void> _showCurrentLocation() async {
-    if (_loadingLocation) return;
-    setState(() => _loadingLocation = true);
-
-    try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showMessage('Aktifkan layanan lokasi/GPS perangkat terlebih dahulu.');
-        return;
-      }
-
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied) {
-        _showMessage('Izin lokasi belum diberikan.');
-        return;
-      }
-      if (permission == LocationPermission.deniedForever) {
-        _showMessage(
-          'Izin lokasi ditolak permanen. Aktifkan dari Pengaturan aplikasi.',
-        );
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 20),
-        ),
-      );
-
-      if (!mounted) return;
-      setState(() => _currentPosition = position);
-
-      if (_mapReady) {
-        _mapController.move(LatLng(position.latitude, position.longitude), 15);
-      }
-    } catch (e) {
-      _showMessage('Lokasi belum berhasil diperoleh. Coba lagi.');
-      debugPrint('Gagal mendapatkan lokasi: $e');
-    } finally {
-      if (mounted) setState(() => _loadingLocation = false);
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // Lokasi pengguna
+  // ---------------------------------------------------------------------------
 
   void _showMessage(String message) {
     if (!mounted) return;
@@ -356,6 +360,93 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
   void _focusCity() {
     if (_mapReady) _mapController.move(_selectedCenter, 12);
   }
+
+  Future<Position?> _getUserPosition() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showMessage('Aktifkan layanan lokasi/GPS perangkat terlebih dahulu.');
+      return null;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      _showMessage('Izin lokasi belum diberikan.');
+      return null;
+    }
+    if (permission == LocationPermission.deniedForever) {
+      _showMessage(
+        'Izin lokasi ditolak permanen. Aktifkan dari Pengaturan aplikasi.',
+      );
+      return null;
+    }
+
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 20),
+        ),
+      );
+    } on TimeoutException {
+      // GPS lambat (mis. di dalam gedung): pakai lokasi terakhir bila ada.
+      final last = await Geolocator.getLastKnownPosition();
+      if (last == null) rethrow;
+      return last;
+    }
+  }
+
+  Future<void> _showCurrentLocation() async {
+    if (_loadingLocation) return;
+    setState(() => _loadingLocation = true);
+
+    try {
+      final position = await _getUserPosition();
+      if (position == null || !mounted) return;
+      setState(() => _currentPosition = position);
+
+      if (_mapReady) {
+        _mapController.move(LatLng(position.latitude, position.longitude), 15);
+      }
+    } catch (e) {
+      _showMessage('Lokasi belum berhasil diperoleh. Coba lagi.');
+      debugPrint('Gagal mendapatkan lokasi: $e');
+    } finally {
+      if (mounted) setState(() => _loadingLocation = false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Google Maps
+  // ---------------------------------------------------------------------------
+
+  /// Membuka rute di Google Maps. Titik awal sengaja tidak dikirim, sehingga
+  /// Google Maps otomatis memakai lokasi pengguna saat itu. Moda perjalanan
+  /// (mobil, jalan kaki, dll.) bisa diganti langsung di Google Maps.
+  Future<void> _openGoogleMaps(_Destination destination) async {
+    final uri = Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination':
+          '${destination.location.latitude},${destination.location.longitude}',
+    });
+
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened) {
+        _showMessage('Google Maps tidak dapat dibuka pada perangkat ini.');
+      }
+    } catch (e) {
+      debugPrint('Gagal membuka Google Maps: $e');
+      _showMessage('Google Maps tidak dapat dibuka. Coba lagi.');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Detail destinasi
+  // ---------------------------------------------------------------------------
 
   void _showDestination(_Destination destination) {
     showModalBottomSheet<void>(
@@ -384,28 +475,28 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
               const SizedBox(height: 12),
               Text(destination.description),
               const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    _openGoogleMaps(destination);
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: safarGreen,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                  icon: const Icon(Icons.directions),
+                  label: const Text('Buka rute di Google Maps'),
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        if (destination.id.startsWith('search_')) {
-                          if (isSaved) {
-                            final updated = Set<String>.from(_savedIds)
-                              ..remove(destination.id);
-                            final prefs = await SharedPreferences.getInstance();
-                            await prefs.setStringList(
-                              _savedKey,
-                              updated.toList(),
-                            );
-                            if (!mounted) return;
-                            setState(() => _savedIds = updated);
-                          } else {
-                            await _saveSearchResult(destination);
-                          }
-                        } else {
-                          await _toggleSaved(destination);
-                        }
+                        await _toggleSavedAny(destination);
                         if (!sheetContext.mounted) return;
                         Navigator.pop(sheetContext);
                       },
@@ -677,23 +768,7 @@ class _PetaLokasiPageState extends State<PetaLokasiPage> {
                                   ? Icons.bookmark
                                   : Icons.bookmark_border,
                             ),
-                            onPressed: () async {
-                              if (_savedIds.contains(result.id)) {
-                                final updated = Set<String>.from(_savedIds)
-                                  ..remove(result.id);
-                                final prefs =
-                                    await SharedPreferences.getInstance();
-                                await prefs.setStringList(
-                                  _savedKey,
-                                  updated.toList(),
-                                );
-                                if (mounted) {
-                                  setState(() => _savedIds = updated);
-                                }
-                              } else {
-                                await _saveSearchResult(result);
-                              }
-                            },
+                            onPressed: () => _toggleSavedAny(result),
                           ),
                         );
                       },
