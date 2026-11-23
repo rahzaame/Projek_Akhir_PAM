@@ -495,7 +495,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _buildHome(),
       _buildPanduan(),
       _buildPeta(),
-      _buildKeuangan(),
+      _buildAlat(),
       _buildProfileMenu(),
     ];
 
@@ -869,17 +869,12 @@ class _DashboardPageState extends State<DashboardPage> {
             ).push(MaterialPageRoute(builder: (_) => const KompasKiblatPage()));
           },
         ),
-        _featureTile(
-          Icons.record_voice_over_outlined,
-          'Penerjemah Suara',
-          'Terjemahkan percakapan secara langsung',
-          () => _openFeaturePage(const PenerjemahSuaraPage()),
-        ),
+        
       ],
     );
   }
 
-  Widget _buildKeuangan() {
+  Widget _buildAlat() {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -888,6 +883,12 @@ class _DashboardPageState extends State<DashboardPage> {
           'Agenda Saya',
           'Atur jadwal dan pengingat pribadi',
           () => _openFeaturePage(const MySchedulePage()),
+        ),
+        _featureTile(
+          Icons.record_voice_over_outlined,
+          'Penerjemah Suara',
+          'Terjemahkan percakapan secara langsung',
+          () => _openFeaturePage(const PenerjemahSuaraPage()),
         ),
         _featureTile(
           Icons.currency_exchange_rounded,
